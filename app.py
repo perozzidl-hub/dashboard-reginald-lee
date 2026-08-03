@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# ESTILOS CSS CORREGIDOS (SIN BLOQUES NEGROS Y CON MÁXIMO CONTRASTE)
+# ESTILOS CSS CORREGIDOS (SIN AFECCIÓN AL RESTO DE LA APP)
 # ---------------------------------------------------------
 st.markdown("""
     <style>
@@ -42,9 +42,10 @@ st.markdown("""
         color: #E5E7EB !important;
     }
 
-    /* TÍTULOS PRINCIPALES DE PÁGINA Y SECCIONES */
+    /* TÍTULOS PRINCIPALES DE PÁGINA Y SECCIONES EN CUERPO PRINCIPAL */
     .main h1, .main h2, .main h3, .main h4, .main h5,
-    div[data-testid="stMarkdownContainer"] h3 {
+    div[data-testid="stMarkdownContainer"] h3,
+    div[data-testid="stMarkdownContainer"] h4 {
         color: #111827 !important;
         font-weight: 700 !important;
     }
@@ -71,7 +72,7 @@ st.markdown("""
         margin-bottom: 0;
     }
 
-    /* CARDS DE KPI (BORDES SUAVES Y REDONDEADOS) */
+    /* CARDS DE KPI */
     .custom-card {
         background-color: #FFFFFF;
         border-radius: 12px !important;
@@ -105,7 +106,7 @@ st.markdown("""
     .text-red { color: #E61C24 !important; }
     .text-green { color: #10B981 !important; }
 
-    /* 3. BORDES SUAVES Y REDONDEADOS PARA CONTENEDORES DE GRÁFICOS ST.PLOTLY_CHART */
+    /* BORDES REDONDEADOS PARA CONTENEDORES PLOTLY */
     div[data-testid="stPlotlyChart"] {
         background-color: #111827 !important;
         border-radius: 14px !important;
@@ -114,13 +115,42 @@ st.markdown("""
         overflow: hidden !important;
     }
 
-    /* POP-UP DETALLE */
+    /* CORRECCIÓN ESPECÍFICA: TARJETA Y TEXTOS DEL INSPECTOR DE TEXTO INTERNO */
     .detail-popup {
-        background-color: #FFFBEB;
-        border-left: 5px solid #F59E0B;
-        padding: 15px 20px;
-        border-radius: 12px;
-        margin: 15px 0;
+        background-color: #FEF3C7 !important; /* Fondo crema/amarillo cálido suave */
+        border-left: 6px solid #D97706 !important;
+        padding: 18px 22px !important;
+        border-radius: 12px !important;
+        margin: 15px 0 !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+    }
+    .detail-popup h5 {
+        color: #B45309 !important;
+        font-weight: 800 !important;
+        margin: 0 0 10px 0 !important;
+        font-size: 16px !important;
+    }
+    .detail-popup p {
+        font-size: 15px !important;
+        font-weight: 700 !important;
+        color: #0F172A !important; /* Texto negro brillante con total contraste */
+        margin: 0 !important;
+        line-height: 1.5 !important;
+    }
+    .detail-popup small {
+        color: #374151 !important; /* Gris oscuro para los metadatos inferior */
+        font-size: 12px !important;
+        font-weight: 600 !important;
+    }
+    .detail-popup hr {
+        margin: 12px 0 !important;
+        border-color: #FCD34D !important;
+    }
+
+    /* Estilo para que la etiqueta del selectbox de transacción se vea oscura en la app principal */
+    .stSelectbox label {
+        color: #111827 !important;
+        font-weight: 700 !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -379,7 +409,6 @@ if df is not None:
         fig_gauge = go.Figure(go.Indicator(
             mode = "gauge+number",
             value = pct_ejecucion,
-            # NÚMERO / PORCENTAJE TOTALMENTE BLANCO Y DESTACADO
             number = {'suffix': "%", 'font': {'size': 28, 'color': '#FFFFFF', 'family': 'Arial'}},
             gauge = {
                 'axis': {'range': [0, max(120, pct_ejecucion)], 'tickcolor': "#FFFFFF", 'tickfont': {'color': '#FFFFFF'}},
@@ -499,7 +528,7 @@ if df is not None:
     )
 
     # ---------------------------------------------------------
-    # INSPECTOR DE TEXTO INTERNO
+    # INSPECTOR DE TEXTO INTERNO (REVISADO Y 100% LEGIBLE)
     # ---------------------------------------------------------
     st.markdown("#### 📌 Inspeccionar 'Texto Interno' de un Gasto Específico")
     
@@ -516,10 +545,10 @@ if df is not None:
             
             st.markdown(f"""
                 <div class="detail-popup">
-                    <h5 style="color: #B45309 !important; margin: 0 0 8px 0;">📝 Texto Interno / Detalle Completo de la Compra</h5>
-                    <p style="font-size: 15px; font-weight: 600; color: #1F2937 !important; margin: 0;">"{item_row['TEXTO INTERNO']}"</p>
-                    <hr style="margin: 10px 0; border-color: #FDE68A;">
-                    <small style="color: #4B5563 !important;"><b>Proveedor:</b> {item_row['DES1']} | <b>Cuenta:</b> {item_row['DESC CTA CBLE']} | <b>N° Interno:</b> {item_row['INTERNO']} | <b>Comprobante:</b> {item_row['COMPROBANTE']}</small>
+                    <h5>📝 Texto Interno / Detalle Completo de la Compra</h5>
+                    <p>"{item_row['TEXTO INTERNO']}"</p>
+                    <hr>
+                    <small><b>Proveedor:</b> {item_row['DES1']} | <b>Cuenta:</b> {item_row['DESC CTA CBLE']} | <b>N° Interno:</b> {item_row['INTERNO']} | <b>Comprobante:</b> {item_row['COMPROBANTE']}</small>
                 </div>
             """, unsafe_allow_html=True)
     else:
