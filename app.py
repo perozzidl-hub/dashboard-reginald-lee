@@ -13,8 +13,14 @@ st.set_page_config(
     initial_sidebar_state="auto"
 )
 
+# Configuración de reescalado para Plotly
+PLOTLY_CONFIG = {
+    'responsive': True,
+    'displayModeBar': False
+}
+
 # ---------------------------------------------------------
-# ESTILOS CSS CORREGIDOS (Nitidez, Fix de Fuentes y Botones)
+# ESTILOS CSS CORREGIDOS (Nitidez, Zoom & Contenedores)
 # ---------------------------------------------------------
 st.markdown("""
     <style>
@@ -30,7 +36,7 @@ st.markdown("""
         background-color: #0E1117 !important;
     }
 
-    /* Ocultar textos sr-only para evitar glitches como 'visibili...' o 'uploadpload' */
+    /* Ocultar textos sr-only */
     .sr-only, 
     [data-testid="stSidebar"] .sr-only, 
     div[data-baseweb="input"] span[class*="sr-only"],
@@ -44,6 +50,20 @@ st.markdown("""
         clip: rect(0, 0, 0, 0) !important;
         white-space: nowrap !important;
         border: 0 !important;
+    }
+
+    /* ------------------------------------
+       ESTILIZACIÓN DE TÍTULOS DE GRÁFICOS (FIX ZOOM)
+    ------------------------------------ */
+    .chart-box-title {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        color: #FFFFFF !important;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+        line-height: 1.2;
     }
 
     /* ------------------------------------
@@ -80,7 +100,6 @@ st.markdown("""
         margin-bottom: 25px !important;
     }
 
-    /* ENTRADAS DE TEXTO (USUARIO Y CONTRASEÑA) */
     div[data-testid="stForm"] label p {
         color: #E5E7EB !important;
         font-weight: 600 !important;
@@ -106,7 +125,6 @@ st.markdown("""
         -webkit-text-fill-color: #6B7280 !important;
     }
 
-    /* Botón Submit Rojo del Login */
     div[data-testid="stForm"] button[kind="secondaryFormSubmit"] {
         background-color: #E61C24 !important;
         color: #FFFFFF !important;
@@ -126,13 +144,12 @@ st.markdown("""
     }
 
     /* ------------------------------------
-       SIDEBAR Y FILE UPLOADER (IMAGEN 3 FIX)
+       SIDEBAR Y FILE UPLOADER
     ------------------------------------ */
     section[data-testid="stSidebar"] {
         background-color: #111827 !important;
     }
 
-    /* Corrección del File Uploader para evitar 'uploadpload' */
     [data-testid="stFileUploader"] section {
         background-color: #1A1D24 !important;
         border: 1px dashed #374151 !important;
@@ -147,7 +164,6 @@ st.markdown("""
         border-radius: 6px !important;
     }
 
-    /* Botones generales del Sidebar (ej: Cerrar Sesión) */
     section[data-testid="stSidebar"] button {
         border-radius: 8px !important;
         border: 1px solid #374151 !important;
@@ -343,7 +359,6 @@ if not st.session_state['logged_in']:
     
     with col_l2:
         with st.form("login_form"):
-            # BOTELLA ROJA COCA-COLA - SILUETA FIEL A LA IMAGEN 1
             st.markdown("""
                 <div style="text-align: center; margin-bottom: 15px;">
                     <svg width="40" height="120" viewBox="0 0 100 300" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -498,11 +513,13 @@ if df is not None:
             </div>
         """, unsafe_allow_html=True)
 
-    # Gráficos
-    col_g1, col_g2, col_g3 = st.columns([1.5, 1.2, 1])
+    # ---------------------------------------------------------
+    # SECCIÓN GRÁFICOS RECONSTRUIDA (ANTI-DEFORMACIÓN AL HACER ZOOM)
+    # ---------------------------------------------------------
+    col_g1, col_g2, col_g3 = st.columns([1.3, 1.1, 1.0])
 
     with col_g1:
-        st.markdown("### 📅 Presupuesto vs Real por Mes")
+        st.markdown('<div class="chart-box-title">📅 Presupuesto vs Real por Mes</div>', unsafe_allow_html=True)
         p_mes = presupuesto_df.groupby('MES_NOMBRE')['SALDO'].sum().reset_index().rename(columns={'SALDO': 'Presupuesto'})
         g_mes = gasto_df.groupby('MES_NOMBRE')['SALDO'].apply(lambda x: abs(x.sum())).reset_index().rename(columns={'SALDO': 'Gasto Real'})
         comp_mes = pd.merge(p_mes, g_mes, on='MES_NOMBRE', how='outer').fillna(0)
@@ -511,34 +528,36 @@ if df is not None:
         fig_mes.add_trace(go.Bar(x=comp_mes['MES_NOMBRE'], y=comp_mes['Presupuesto'], name='Presupuesto', marker_color='#9CA3AF'))
         fig_mes.add_trace(go.Bar(x=comp_mes['MES_NOMBRE'], y=comp_mes['Gasto Real'], name='Gasto Real', marker_color='#E61C24'))
         fig_mes.update_layout(
+            autosize=True,
             paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
-            xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
-            yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
-            barmode='group', height=300, margin=dict(l=15, r=15, t=15, b=15),
-            legend=dict(orientation="h", y=1.15, font=dict(color='#FFFFFF'))
+            xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF', size=11), automargin=True),
+            yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF', size=11), automargin=True),
+            barmode='group', height=310, margin=dict(l=20, r=15, t=10, b=30),
+            legend=dict(orientation="h", y=1.18, x=0, font=dict(color='#FFFFFF', size=11))
         )
-        st.plotly_chart(fig_mes, use_container_width=True)
+        st.plotly_chart(fig_mes, use_container_width=True, config=PLOTLY_CONFIG)
 
     with col_g2:
-        st.markdown("### 📊 Gasto por Grupo de Cuentas")
+        st.markdown('<div class="chart-box-title">📊 Gasto por Grupo de Cuentas</div>', unsafe_allow_html=True)
         g_grupo = gasto_df.groupby('GRUPO DE CUENTAS')['SALDO'].apply(lambda x: abs(x.sum())).reset_index().sort_values(by='SALDO', ascending=True).tail(7)
         fig_grupo = px.bar(g_grupo, x='SALDO', y='GRUPO DE CUENTAS', orientation='h', color_discrete_sequence=['#E61C24'])
         fig_grupo.update_layout(
+            autosize=True,
             paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
-            xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
-            yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
-            height=300, margin=dict(l=15, r=15, t=15, b=15), xaxis_title="", yaxis_title=""
+            xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF', size=11), automargin=True),
+            yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF', size=10), automargin=True),
+            height=310, margin=dict(l=10, r=15, t=10, b=25), xaxis_title="", yaxis_title=""
         )
-        st.plotly_chart(fig_grupo, use_container_width=True)
+        st.plotly_chart(fig_grupo, use_container_width=True, config=PLOTLY_CONFIG)
 
     with col_g3:
-        st.markdown("### 🎯 Nivel de Ejecución")
+        st.markdown('<div class="chart-box-title">🎯 Nivel de Ejecución</div>', unsafe_allow_html=True)
         fig_gauge = go.Figure(go.Indicator(
             mode = "gauge+number",
             value = pct_ejecucion,
-            number = {'suffix': "%", 'font': {'size': 28, 'color': '#FFFFFF', 'family': 'Arial'}},
+            number = {'suffix': "%", 'font': {'size': 26, 'color': '#FFFFFF', 'family': 'Arial'}},
             gauge = {
-                'axis': {'range': [0, max(120, pct_ejecucion)], 'tickcolor': "#FFFFFF", 'tickfont': {'color': '#FFFFFF'}},
+                'axis': {'range': [0, max(120, pct_ejecucion)], 'tickcolor': "#FFFFFF", 'tickfont': {'color': '#FFFFFF', 'size': 11}},
                 'bar': {'color': "#E61C24" if pct_ejecucion > 100 else "#9CA3AF"},
                 'steps': [
                     {'range': [0, 80], 'color': "#374151"},
@@ -548,16 +567,17 @@ if df is not None:
             }
         ))
         fig_gauge.update_layout(
+            autosize=True,
             paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
-            height=300, margin=dict(l=20, r=20, t=20, b=20)
+            height=310, margin=dict(l=35, r=35, t=35, b=25)
         )
-        st.plotly_chart(fig_gauge, use_container_width=True)
+        st.plotly_chart(fig_gauge, use_container_width=True, config=PLOTLY_CONFIG)
 
     # Segunda fila
     c_r2_1, c_r2_2 = st.columns([1, 1.5])
 
     with c_r2_1:
-        st.markdown("### 🏢 Gastos por Locación")
+        st.markdown('<div class="chart-box-title">🏢 Gastos por Locación</div>', unsafe_allow_html=True)
         g_loc = gasto_df.groupby('LOCACION')['SALDO'].apply(lambda x: abs(x.sum())).reset_index()
         fig_loc = px.pie(
             g_loc, values='SALDO', names='LOCACION', hole=0.4,
@@ -565,13 +585,14 @@ if df is not None:
         )
         fig_loc.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(color='#FFFFFF'))
         fig_loc.update_layout(
+            autosize=True,
             paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
             height=300, margin=dict(l=15, r=15, t=15, b=15), legend=dict(font=dict(color='#FFFFFF'))
         )
-        st.plotly_chart(fig_loc, use_container_width=True)
+        st.plotly_chart(fig_loc, use_container_width=True, config=PLOTLY_CONFIG)
 
     with c_r2_2:
-        st.markdown("### ⚠️ Cuentas con Mayor Desviación")
+        st.markdown('<div class="chart-box-title">⚠️ Cuentas con Mayor Desviación</div>', unsafe_allow_html=True)
         p_cta = presupuesto_df.groupby('DESC CTA CBLE')['SALDO'].sum().rename('Presupuesto')
         g_cta = gasto_df.groupby('DESC CTA CBLE')['SALDO'].apply(lambda x: abs(x.sum())).rename('Gasto Real')
         comp_cta = pd.concat([p_cta, g_cta], axis=1).fillna(0)
@@ -583,12 +604,13 @@ if df is not None:
             color='Desviacion', color_continuous_scale=['#6B7280', '#E61C24']
         )
         fig_desv.update_layout(
+            autosize=True,
             paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
-            xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
-            yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
+            xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
+            yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
             height=300, margin=dict(l=15, r=15, t=15, b=15), xaxis_title="Desviación en $", yaxis_title=""
         )
-        st.plotly_chart(fig_desv, use_container_width=True)
+        st.plotly_chart(fig_desv, use_container_width=True, config=PLOTLY_CONFIG)
 
     # Tabla Transaccional
     st.markdown("---")
