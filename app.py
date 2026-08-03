@@ -13,58 +13,28 @@ st.set_page_config(
     initial_sidebar_state="auto"
 )
 
-# Botella icónica de Coca-Cola en SVG puro (100% estable, no rompe el código)
-COCA_COLA_BOTTLE_SVG = """
-<svg width="45" height="110" viewBox="0 0 100 250" fill="#E61C24" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 4px 6px rgba(230,28,36,0.25));">
-    <!-- Tapa -->
-    <rect x="38" y="5" width="24" height="8" rx="2" fill="#E61C24" />
-    <rect x="36" y="13" width="28" height="4" rx="1" fill="#B91C1C" />
-    <!-- Cuello -->
-    <path d="M 38 17 Q 40 45 30 65 Q 20 85 22 120 Q 20 160 26 200 Q 30 225 35 235 L 65 235 Q 70 225 74 200 Q 80 160 78 120 Q 80 85 70 65 Q 60 45 62 17 Z" />
-    <!-- Detalle Etiqueta Coca-Cola -->
-    <path d="M 21 115 Q 50 125 79 115 L 78 145 Q 50 155 22 145 Z" fill="#FFFFFF" opacity="0.15" />
-</svg>
-"""
+# Imagen oficial de Coca-Cola (Carga rápida y garantizada vía CDN)
+COCA_COLA_LOGO = "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Coca-Cola_logo.svg/512px-Coca-Cola_logo.svg.png"
 
 # ---------------------------------------------------------
-# ESTILOS CSS
+# ESTILOS CSS FORZADOS (Simetría y Diseño Limpio)
 # ---------------------------------------------------------
 st.markdown("""
     <style>
-    /* Fondo General */
+    /* Fondo General Claro */
     .stApp {
         background-color: #F8F9FA !important;
     }
 
     /* ------------------------------------
-       LOGIN UNIFICADO Y SIMÉTRICO
+       TARJETA DE LOGIN SIMÉTRICA
     ------------------------------------ */
-    .login-header-box {
-        text-align: center;
-        margin-bottom: 22px;
-    }
-
-    .login-title {
-        color: #111827 !important;
-        font-weight: 800 !important;
-        font-size: 24px !important;
-        margin-top: 10px !important;
-        margin-bottom: 2px !important;
-        letter-spacing: -0.5px;
-    }
-
-    .login-subtitle {
-        color: #6B7280 !important;
-        font-weight: 600 !important;
-        font-size: 13px !important;
-    }
-
-    /* Tarjeta del Formulario Única */
+    /* Unifica todo el formulario en una sola tarjeta blanca */
     div[data-testid="stForm"] {
         background-color: #FFFFFF !important;
         border-radius: 16px !important;
         padding: 35px 30px !important;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06) !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important;
         border-top: 6px solid #E61C24 !important;
         border-left: 1px solid #E5E7EB !important;
         border-right: 1px solid #E5E7EB !important;
@@ -73,35 +43,48 @@ st.markdown("""
         margin: 0 auto;
     }
 
-    /* Etiquetas de Inputs */
-    div[data-testid="stForm"] label {
-        color: #374151 !important;
+    /* Títulos dentro del Login */
+    .login-title {
+        color: #111827 !important;
+        font-weight: 800 !important;
+        font-size: 22px !important;
+        text-align: center;
+        margin-top: 10px !important;
+        margin-bottom: 2px !important;
+    }
+
+    .login-subtitle {
+        color: #6B7280 !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        text-align: center;
+        margin-bottom: 20px !important;
+    }
+
+    /* Forzar color claro en los campos de texto (anula el modo oscuro de Streamlit) */
+    div[data-testid="stForm"] label p {
+        color: #1F2937 !important;
         font-weight: 700 !important;
         font-size: 13px !important;
     }
 
-    /* Inputs Claros y Limpios */
-    div[data-testid="stForm"] input {
-        background-color: #F9FAFB !important;
-        color: #111827 !important;
-        border: 1px solid #D1D5DB !important;
-        border-radius: 8px !important;
-        padding: 10px 12px !important;
-    }
-
-    /* Contenedor del ojo de la contraseña */
     div[data-testid="stForm"] div[data-baseweb="input"] {
-        background-color: #F9FAFB !important;
+        background-color: #F3F4F6 !important;
         border: 1px solid #D1D5DB !important;
         border-radius: 8px !important;
     }
 
-    div[data-testid="stForm"] input:focus {
-        border-color: #E61C24 !important;
-        box-shadow: 0 0 0 3px rgba(230, 28, 36, 0.15) !important;
+    div[data-testid="stForm"] input {
+        color: #111827 !important;
+        background-color: transparent !important;
     }
 
-    /* Botón Submit */
+    /* Botón Ojo de la Contraseña */
+    div[data-testid="stForm"] button[aria-label="Show password"] {
+        color: #4B5563 !important;
+    }
+
+    /* Botón Submit Rojo */
     div[data-testid="stForm"] button[kind="secondaryFormSubmit"] {
         background-color: #E61C24 !important;
         color: #FFFFFF !important;
@@ -111,7 +94,7 @@ st.markdown("""
         font-size: 14px !important;
         padding: 12px 20px !important;
         width: 100% !important;
-        margin-top: 15px !important;
+        margin-top: 10px !important;
         transition: all 0.2s ease !important;
     }
 
@@ -121,7 +104,7 @@ st.markdown("""
     }
 
     /* ------------------------------------
-       ESTILOS DASHBOARD INTERNO
+       ESTILOS DEL DASHBOARD
     ------------------------------------ */
     section[data-testid="stSidebar"] {
         background-color: #111827 !important;
@@ -291,13 +274,13 @@ if not st.session_state['logged_in']:
     
     with col_l2:
         with st.form("login_form"):
-            st.markdown(f"""
-                <div class="login-header-box">
-                    <div>{COCA_COLA_BOTTLE_SVG}</div>
-                    <div class="login-title">Reginald Lee S.A.</div>
-                    <div class="login-subtitle">Plataforma de Control Presupuestario</div>
-                </div>
-            """, unsafe_allow_html=True)
+            # Logo Centrado mediante st.columns dentro del formulario
+            col_img1, col_img2, col_img3 = st.columns([1, 1.5, 1])
+            with col_img2:
+                st.image(COCA_COLA_LOGO, use_container_width=True)
+            
+            st.markdown('<div class="login-title">Reginald Lee S.A.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="login-subtitle">Plataforma de Control Presupuestario</div>', unsafe_allow_html=True)
             
             user_input = st.text_input("Usuario (Responsable)", placeholder="Ej: galdeman o admin").strip()
             pass_input = st.text_input("Contraseña", type="password").strip()
