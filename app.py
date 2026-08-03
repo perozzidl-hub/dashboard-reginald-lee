@@ -4,16 +4,18 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # ---------------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA Y ESTILOS NATIVOS
+# CONFIGURACIÓN DE PÁGINA
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Reginald Lee - Dashboard Presupuestario",
     page_icon="🥤",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"
 )
 
-# Estilos CSS Limpios (sin cajas vacías)
+# ---------------------------------------------------------
+# ESTILOS CSS RESPONSIVE Y ALTO CONTRASTE
+# ---------------------------------------------------------
 st.markdown("""
     <style>
     /* Fondo General */
@@ -21,61 +23,70 @@ st.markdown("""
         background-color: #F8F9FA !important;
     }
     
+    /* FORZAR COLOR NEGRO VISIBLE EN TODOS LOS TÍTULOS Y SUBTÍTULOS DE STREAMLIT */
+    h1, h2, h3, h4, h5, h6, 
+    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4, .stMarkdown h5,
+    div[data-testid="stMarkdownContainer"] h3,
+    div[data-testid="stMarkdownContainer"] p {
+        color: #111827 !important;
+        font-weight: 700 !important;
+    }
+
     /* Header Corporativo Coca-Cola */
     .main-header {
         background: linear-gradient(135deg, #111111 0%, #E61C24 100%);
-        padding: 22px 30px;
-        border-radius: 14px;
+        padding: 20px 25px;
+        border-radius: 12px;
         color: white;
-        margin-bottom: 25px;
+        margin-bottom: 20px;
         box-shadow: 0 4px 15px rgba(230, 28, 36, 0.2);
     }
     .main-header h2 {
         color: #FFFFFF !important;
         margin: 0;
         font-weight: 800;
-        font-size: 26px;
+        font-size: 24px;
     }
     .main-header p {
         margin-top: 5px;
         color: #F3F4F6 !important;
-        font-size: 14px;
+        font-size: 13px;
         margin-bottom: 0;
     }
 
-    /* CARDS DE KPI DE ALTO CONTRASTE */
+    /* CARDS DE KPI (RESPONSIVE) */
     .custom-card {
         background-color: #FFFFFF;
         border-radius: 12px;
-        padding: 18px 22px;
+        padding: 16px 20px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.06);
-        border-top: 5px solid #E61C24;
-        margin-bottom: 20px;
-        min-height: 110px;
+        border-top: 4px solid #E61C24;
+        margin-bottom: 15px;
+        min-height: 100px;
         display: flex;
         flex-direction: column;
         justify-content: center;
     }
     .card-title {
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 700;
-        color: #4B5563;
+        color: #4B5563 !important;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
     }
     .card-value {
-        font-size: 22px;
+        font-size: 20px;
         font-weight: 800;
-        color: #111827;
+        color: #111827 !important;
         margin-bottom: 2px;
     }
     .card-sub {
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
     }
-    .text-red { color: #E61C24; }
-    .text-green { color: #10B981; }
+    .text-red { color: #E61C24 !important; }
+    .text-green { color: #10B981 !important; }
 
     /* Inspección de Texto Interno */
     .detail-popup {
@@ -84,6 +95,30 @@ st.markdown("""
         padding: 15px 20px;
         border-radius: 8px;
         margin: 15px 0;
+    }
+
+    /* AJUSTES RESPONSIVE PARA DISPOSITIVOS MÓVILES (TELÉFONOS Y TABLETS) */
+    @media (max-width: 768px) {
+        .main-header {
+            padding: 15px 18px;
+        }
+        .main-header h2 {
+            font-size: 18px !important;
+        }
+        .main-header p {
+            font-size: 12px !important;
+        }
+        .custom-card {
+            padding: 12px 15px;
+            min-height: auto;
+        }
+        .card-value {
+            font-size: 18px !important;
+        }
+        /* Ajustar espaciado de los bloques en celular */
+        div[data-testid="column"] {
+            margin-bottom: 10px;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -139,11 +174,11 @@ if 'df_data' not in st.session_state:
 if not st.session_state['logged_in']:
     col_l1, col_l2, col_l3 = st.columns([1, 1.4, 1])
     with col_l2:
-        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("""
-            <div style="background-color: white; padding: 35px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; border-top: 6px solid #E61C24;">
-                <h2 style="color: #E61C24; margin-bottom: 5px; font-size: 28px;">🥤 Reginald Lee S.A.</h2>
-                <p style="color: #4B5563; font-weight: 600; margin-bottom: 25px;">Plataforma de Control Presupuestario</p>
+            <div style="background-color: white; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; border-top: 6px solid #E61C24;">
+                <h2 style="color: #E61C24 !important; margin-bottom: 5px; font-size: 24px;">🥤 Reginald Lee S.A.</h2>
+                <p style="color: #4B5563 !important; font-weight: 600; margin-bottom: 20px;">Plataforma de Control Presupuestario</p>
             </div>
         """, unsafe_allow_html=True)
         
@@ -256,9 +291,9 @@ if df is not None:
     pct_ejecucion = (tot_gasto / tot_presupuesto * 100) if tot_presupuesto > 0 else 0
 
     # ---------------------------------------------------------
-    # 1. CARDS DE KPI
+    # 1. CARDS DE KPI (ADAPTATIVAS EN TELÉFONOS/TABLETS)
     # ---------------------------------------------------------
-    k1, k2, k3, k4 = st.columns(4)
+    k1, k2, k3, k4 = st.columns([1, 1, 1, 1])
 
     with k1:
         st.markdown(f"""
@@ -295,15 +330,13 @@ if df is not None:
             </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-
     # ---------------------------------------------------------
-    # 2. PRIMERA FILA DE GRÁFICOS (ALINEACIÓN PERFECTA DE TÍTULOS)
+    # 2. PRIMERA FILA DE GRÁFICOS (TÍTULOS CON NEGRO INTENSO)
     # ---------------------------------------------------------
     col_g1, col_g2, col_g3 = st.columns([1.5, 1.2, 1])
 
     with col_g1:
-        st.subheader("📅 Presupuesto vs Real por Mes")
+        st.markdown("<h3 style='color: #111827 !important; margin-bottom: 10px;'>📅 Presupuesto vs Real por Mes</h3>", unsafe_allow_html=True)
         p_mes = presupuesto_df.groupby('MES_NOMBRE')['SALDO'].sum().reset_index().rename(columns={'SALDO': 'Presupuesto'})
         g_mes = gasto_df.groupby('MES_NOMBRE')['SALDO'].apply(lambda x: abs(x.sum())).reset_index().rename(columns={'SALDO': 'Gasto Real'})
         comp_mes = pd.merge(p_mes, g_mes, on='MES_NOMBRE', how='outer').fillna(0)
@@ -315,14 +348,14 @@ if df is not None:
         st.plotly_chart(fig_mes, use_container_width=True)
 
     with col_g2:
-        st.subheader("📊 Gasto por Grupo de Cuentas")
+        st.markdown("<h3 style='color: #111827 !important; margin-bottom: 10px;'>📊 Gasto por Grupo de Cuentas</h3>", unsafe_allow_html=True)
         g_grupo = gasto_df.groupby('GRUPO DE CUENTAS')['SALDO'].apply(lambda x: abs(x.sum())).reset_index().sort_values(by='SALDO', ascending=True).tail(7)
         fig_grupo = px.bar(g_grupo, x='SALDO', y='GRUPO DE CUENTAS', orientation='h', color_discrete_sequence=['#E61C24'])
         fig_grupo.update_layout(template='plotly_white', height=310, margin=dict(l=10, r=10, t=10, b=10), xaxis_title="", yaxis_title="")
         st.plotly_chart(fig_grupo, use_container_width=True)
 
     with col_g3:
-        st.subheader("🎯 Nivel de Ejecución")
+        st.markdown("<h3 style='color: #111827 !important; margin-bottom: 10px;'>🎯 Nivel de Ejecución</h3>", unsafe_allow_html=True)
         fig_gauge = go.Figure(go.Indicator(
             mode = "gauge+number",
             value = pct_ejecucion,
@@ -340,15 +373,13 @@ if df is not None:
         fig_gauge.update_layout(height=310, margin=dict(l=15, r=15, t=15, b=15))
         st.plotly_chart(fig_gauge, use_container_width=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-
     # ---------------------------------------------------------
-    # 3. SEGUNDA FILA DE GRÁFICOS (SIN RECUADROS VACÍOS)
+    # 3. SEGUNDA FILA DE GRÁFICOS
     # ---------------------------------------------------------
     c_r2_1, c_r2_2 = st.columns([1, 1.5])
 
     with c_r2_1:
-        st.subheader("🏢 Gastos por Locación")
+        st.markdown("<h3 style='color: #111827 !important; margin-bottom: 10px;'>🏢 Gastos por Locación</h3>", unsafe_allow_html=True)
         g_loc = gasto_df.groupby('LOCACION')['SALDO'].apply(lambda x: abs(x.sum())).reset_index()
         fig_loc = px.pie(
             g_loc, values='SALDO', names='LOCACION', hole=0.4,
@@ -359,7 +390,7 @@ if df is not None:
         st.plotly_chart(fig_loc, use_container_width=True)
 
     with c_r2_2:
-        st.subheader("⚠️ Cuentas con Mayor Desviación")
+        st.markdown("<h3 style='color: #111827 !important; margin-bottom: 10px;'>⚠️ Cuentas con Mayor Desviación</h3>", unsafe_allow_html=True)
         p_cta = presupuesto_df.groupby('DESC CTA CBLE')['SALDO'].sum().rename('Presupuesto')
         g_cta = gasto_df.groupby('DESC CTA CBLE')['SALDO'].apply(lambda x: abs(x.sum())).rename('Gasto Real')
         comp_cta = pd.concat([p_cta, g_cta], axis=1).fillna(0)
@@ -374,10 +405,10 @@ if df is not None:
         st.plotly_chart(fig_desv, use_container_width=True)
 
     # ---------------------------------------------------------
-    # 4. TABLA TRANSACCIONAL DE GASTOS (SIN COLUMNA TEXTO INTERNO)
+    # 4. TABLA TRANSACCIONAL DE GASTOS
     # ---------------------------------------------------------
     st.markdown("---")
-    st.subheader("🔍 Consulta y Auditoría Transaccional de Gastos")
+    st.markdown("<h3 style='color: #111827 !important;'>🔍 Consulta y Auditoría Transaccional de Gastos</h3>", unsafe_allow_html=True)
 
     df_auditoria = gasto_df.copy()
 
@@ -406,7 +437,6 @@ if df is not None:
     df_auditoria['MONTO_MOSTRAR'] = df_auditoria['SALDO'] * -1
     df_auditoria['MONTO_FORMATO'] = df_auditoria['MONTO_MOSTRAR'].apply(lambda v: formato_moneda(v, con_decimales=True))
 
-    # SE QUITÓ 'TEXTO INTERNO' DE LAS COLUMNAS DE LA TABLA
     cols_tabla = [
         'FECHA', 'MES_NOMBRE', 'LOCACION', 'RESPONSABLE', 
         'GRUPO DE CUENTAS', 'DESC CTA CBLE', 'DES1', 'INTERNO', 'MONTO_FORMATO'
@@ -429,7 +459,7 @@ if df is not None:
     # ---------------------------------------------------------
     # INSPECTOR DE TEXTO INTERNO (POP-UP DETALLE)
     # ---------------------------------------------------------
-    st.markdown("##### 📌 Inspeccionar 'Texto Interno' de un Gasto Especifico")
+    st.markdown("<h4 style='color: #111827 !important; margin-top: 15px;'>📌 Inspeccionar 'Texto Interno' de un Gasto Específico</h4>", unsafe_allow_html=True)
     
     if not df_auditoria.empty:
         opciones_inspeccion = df_auditoria.apply(
@@ -444,10 +474,10 @@ if df is not None:
             
             st.markdown(f"""
                 <div class="detail-popup">
-                    <h5 style="color: #B45309; margin: 0 0 8px 0;">📝 Texto Interno / Detalle Completo de la Compra</h5>
-                    <p style="font-size: 16px; font-weight: 600; color: #1F2937; margin: 0;">"{item_row['TEXTO INTERNO']}"</p>
+                    <h5 style="color: #B45309 !important; margin: 0 0 8px 0;">📝 Texto Interno / Detalle Completo de la Compra</h5>
+                    <p style="font-size: 15px; font-weight: 600; color: #1F2937 !important; margin: 0;">"{item_row['TEXTO INTERNO']}"</p>
                     <hr style="margin: 10px 0; border-color: #FDE68A;">
-                    <small style="color: #4B5563;"><b>Proveedor:</b> {item_row['DES1']} | <b>Cuenta:</b> {item_row['DESC CTA CBLE']} | <b>N° Interno:</b> {item_row['INTERNO']} | <b>Comprobante:</b> {item_row['COMPROBANTE']}</small>
+                    <small style="color: #4B5563 !important;"><b>Proveedor:</b> {item_row['DES1']} | <b>Cuenta:</b> {item_row['DESC CTA CBLE']} | <b>N° Interno:</b> {item_row['INTERNO']} | <b>Comprobante:</b> {item_row['COMPROBANTE']}</small>
                 </div>
             """, unsafe_allow_html=True)
     else:
