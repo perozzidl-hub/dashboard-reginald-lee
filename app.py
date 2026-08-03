@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# ESTILOS CSS CORREGIDOS (SIN AFECCIÓN AL RESTO DE LA APP)
+# ESTILOS CSS CORREGIDOS (INCLUYENDO FIX DEL LOGIN)
 # ---------------------------------------------------------
 st.markdown("""
     <style>
@@ -22,8 +22,61 @@ st.markdown("""
     .stApp {
         background-color: #F8F9FA !important;
     }
-    
-    /* 1. BARRA LATERAL (SIDEBAR): TÍTULOS Y TEXTOS EN BLANCO Y LEGIBLES */
+
+    /* ------------------------------------
+       ESTILOS EXCLUSIVOS DEL LOGIN (FIX)
+    ------------------------------------ */
+    .login-card {
+        background-color: #FFFFFF !important;
+        padding: 30px 25px 20px 25px !important;
+        border-radius: 16px !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important;
+        text-align: center !important;
+        border-top: 6px solid #E61C24 !important;
+        margin-bottom: 20px !important;
+    }
+    .login-title {
+        color: #111827 !important;
+        font-weight: 800 !important;
+        font-size: 26px !important;
+        margin-top: 10px !important;
+        margin-bottom: 5px !important;
+    }
+    .login-subtitle {
+        color: #4B5563 !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        margin-bottom: 0px !important;
+    }
+
+    /* Etiquetas (labels) de los inputs en el cuerpo principal / login */
+    .main label, 
+    div[data-testid="stForm"] label {
+        color: #111827 !important;
+        font-weight: 700 !important;
+        font-size: 14px !important;
+    }
+
+    /* Botón Submit del Login estilizado */
+    div[data-testid="stForm"] button[kind="secondaryFormSubmit"],
+    div[data-testid="stForm"] button {
+        background-color: #E61C24 !important;
+        color: #FFFFFF !important;
+        border-radius: 8px !important;
+        border: none !important;
+        font-weight: 700 !important;
+        padding: 8px 20px !important;
+        width: 100% !important;
+        margin-top: 10px !important;
+    }
+    div[data-testid="stForm"] button:hover {
+        background-color: #B91C1C !important;
+        color: #FFFFFF !important;
+    }
+
+    /* ------------------------------------
+       BARRA LATERAL (SIDEBAR)
+    ------------------------------------ */
     section[data-testid="stSidebar"] {
         background-color: #111827 !important;
     }
@@ -42,7 +95,7 @@ st.markdown("""
         color: #E5E7EB !important;
     }
 
-    /* TÍTULOS PRINCIPALES DE PÁGINA Y SECCIONES EN CUERPO PRINCIPAL */
+    /* TÍTULOS PRINCIPALES DE PÁGINA Y SECCIONES */
     .main h1, .main h2, .main h3, .main h4, .main h5,
     div[data-testid="stMarkdownContainer"] h3,
     div[data-testid="stMarkdownContainer"] h4 {
@@ -115,9 +168,9 @@ st.markdown("""
         overflow: hidden !important;
     }
 
-    /* CORRECCIÓN ESPECÍFICA: TARJETA Y TEXTOS DEL INSPECTOR DE TEXTO INTERNO */
+    /* TARJETA DEL INSPECTOR DE TEXTO INTERNO */
     .detail-popup {
-        background-color: #FEF3C7 !important; /* Fondo crema/amarillo cálido suave */
+        background-color: #FEF3C7 !important;
         border-left: 6px solid #D97706 !important;
         padding: 18px 22px !important;
         border-radius: 12px !important;
@@ -133,12 +186,12 @@ st.markdown("""
     .detail-popup p {
         font-size: 15px !important;
         font-weight: 700 !important;
-        color: #0F172A !important; /* Texto negro brillante con total contraste */
+        color: #0F172A !important;
         margin: 0 !important;
         line-height: 1.5 !important;
     }
     .detail-popup small {
-        color: #374151 !important; /* Gris oscuro para los metadatos inferior */
+        color: #374151 !important;
         font-size: 12px !important;
         font-weight: 600 !important;
     }
@@ -147,7 +200,6 @@ st.markdown("""
         border-color: #FCD34D !important;
     }
 
-    /* Estilo para que la etiqueta del selectbox de transacción se vea oscura en la app principal */
     .stSelectbox label {
         color: #111827 !important;
         font-weight: 700 !important;
@@ -201,16 +253,17 @@ if 'df_data' not in st.session_state:
     st.session_state['df_data'] = obtener_base_inicial()
 
 # ---------------------------------------------------------
-# LOGIN
+# LOGIN CORREGIDO
 # ---------------------------------------------------------
 if not st.session_state['logged_in']:
-    col_l1, col_l2, col_l3 = st.columns([1, 1.4, 1])
+    col_l1, col_l2, col_l3 = st.columns([1, 1.3, 1])
     with col_l2:
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("""
-            <div style="background-color: white; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; border-top: 6px solid #E61C24;">
-                <h2 style="color: #E61C24 !important; margin-bottom: 5px; font-size: 24px;">🥤 Reginald Lee S.A.</h2>
-                <p style="color: #4B5563 !important; font-weight: 600; margin-bottom: 20px;">Plataforma de Control Presupuestario</p>
+            <div class="login-card">
+                <div style="font-size: 38px;">🥤</div>
+                <div class="login-title">Reginald Lee S.A.</div>
+                <div class="login-subtitle">Plataforma de Control Presupuestario</div>
             </div>
         """, unsafe_allow_html=True)
         
@@ -528,7 +581,7 @@ if df is not None:
     )
 
     # ---------------------------------------------------------
-    # INSPECTOR DE TEXTO INTERNO (REVISADO Y 100% LEGIBLE)
+    # INSPECTOR DE TEXTO INTERNO
     # ---------------------------------------------------------
     st.markdown("#### 📌 Inspeccionar 'Texto Interno' de un Gasto Específico")
     
