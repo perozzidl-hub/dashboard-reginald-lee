@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Reginald Lee - Dashboard Presupuestario",
-    page_icon="🍾",
+    page_icon="🥤",
     layout="wide",
     initial_sidebar_state="auto"
 )
@@ -20,7 +20,7 @@ PLOTLY_CONFIG = {
 }
 
 # ---------------------------------------------------------
-# ESTILOS CSS CORREGIDOS (Nitidez, Zoom & Contenedores)
+# ESTILOS CSS (Nitidez, Zoom & Contenedores)
 # ---------------------------------------------------------
 st.markdown("""
     <style>
@@ -87,7 +87,7 @@ st.markdown("""
         font-weight: 800 !important;
         font-size: 22px !important;
         text-align: center;
-        margin-top: 10px !important;
+        margin-top: 5px !important;
         margin-bottom: 2px !important;
         letter-spacing: -0.3px;
     }
@@ -351,7 +351,7 @@ if 'df_data' not in st.session_state:
     st.session_state['df_data'] = obtener_base_inicial()
 
 # ---------------------------------------------------------
-# LOGIN SCREEN
+# LOGIN SCREEN (CON ÍCONO 🥤)
 # ---------------------------------------------------------
 if not st.session_state['logged_in']:
     st.markdown("<br><br>", unsafe_allow_html=True)
@@ -359,11 +359,10 @@ if not st.session_state['logged_in']:
     
     with col_l2:
         with st.form("login_form"):
+            # ÍCONO DE VASO CON SORBETE 🥤
             st.markdown("""
-                <div style="text-align: center; margin-bottom: 15px;">
-                    <svg width="40" height="120" viewBox="0 0 100 300" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M42 6 C42 2 58 2 58 6 L60 18 C60 21 57 23 57 25 C57 30 63 42 66 55 C69 68 72 82 70 98 C68 112 58 125 58 135 C58 145 68 158 70 175 C73 195 71 215 67 235 C64 252 61 268 58 280 C56 288 53 292 50 292 C47 292 44 288 42 280 C39 268 36 252 33 235 C29 215 27 195 30 175 C32 158 42 145 42 135 C42 125 32 112 30 98 C28 82 31 68 34 55 C37 42 43 30 43 25 C43 23 40 21 40 18 Z" fill="#E61C24"/>
-                    </svg>
+                <div style="text-align: center; font-size: 55px; margin-bottom: 10px; line-height: 1;">
+                    🥤
                 </div>
             """, unsafe_allow_html=True)
             
@@ -514,7 +513,7 @@ if df is not None:
         """, unsafe_allow_html=True)
 
     # ---------------------------------------------------------
-    # SECCIÓN GRÁFICOS RECONSTRUIDA (ANTI-DEFORMACIÓN AL HACER ZOOM)
+    # SECCIÓN GRÁFICOS
     # ---------------------------------------------------------
     col_g1, col_g2, col_g3 = st.columns([1.3, 1.1, 1.0])
 
