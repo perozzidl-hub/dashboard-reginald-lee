@@ -13,75 +13,88 @@ st.set_page_config(
     initial_sidebar_state="auto"
 )
 
-# Imagen oficial de Coca-Cola (Carga rápida y garantizada vía CDN)
-COCA_COLA_LOGO = "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Coca-Cola_logo.svg/512px-Coca-Cola_logo.svg.png"
-
 # ---------------------------------------------------------
-# ESTILOS CSS FORZADOS (Simetría y Diseño Limpio)
+# ESTILOS CSS FORZADOS (Suavizado, Alto Contraste y Corrección de Fuentes)
 # ---------------------------------------------------------
 st.markdown("""
     <style>
-    /* Fondo General Claro */
+    /* 1. SUAVIZADO DE TIPOGRAFÍA Y FUENTES GLOBALES */
+    * {
+        -webkit-font-smoothing: antialiased !important;
+        -moz-osx-font-smoothing: grayscale !important;
+        text-rendering: optimizeLegibility !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    }
+
+    /* Fondo General de la App */
     .stApp {
-        background-color: #F8F9FA !important;
+        background-color: #0E1117 !important;
     }
 
     /* ------------------------------------
-       TARJETA DE LOGIN SIMÉTRICA
+       TARJETA DE LOGIN SIMÉTRICA Y CAMPOS
     ------------------------------------ */
-    /* Unifica todo el formulario en una sola tarjeta blanca */
     div[data-testid="stForm"] {
-        background-color: #FFFFFF !important;
+        background-color: #1A1D24 !important;
         border-radius: 16px !important;
         padding: 35px 30px !important;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4) !important;
         border-top: 6px solid #E61C24 !important;
-        border-left: 1px solid #E5E7EB !important;
-        border-right: 1px solid #E5E7EB !important;
-        border-bottom: 1px solid #E5E7EB !important;
+        border-left: 1px solid #2D3139 !important;
+        border-right: 1px solid #2D3139 !important;
+        border-bottom: 1px solid #2D3139 !important;
         max-width: 420px;
         margin: 0 auto;
     }
 
     /* Títulos dentro del Login */
     .login-title {
-        color: #111827 !important;
+        color: #FFFFFF !important;
         font-weight: 800 !important;
         font-size: 22px !important;
         text-align: center;
-        margin-top: 10px !important;
+        margin-top: 15px !important;
         margin-bottom: 2px !important;
+        letter-spacing: -0.5px;
     }
 
     .login-subtitle {
-        color: #6B7280 !important;
-        font-weight: 600 !important;
+        color: #9CA3AF !important;
+        font-weight: 500 !important;
         font-size: 13px !important;
         text-align: center;
-        margin-bottom: 20px !important;
+        margin-bottom: 25px !important;
     }
 
-    /* Forzar color claro en los campos de texto (anula el modo oscuro de Streamlit) */
+    /* CORRECCIÓN DE TEXTO AL TIPIEAR (USUARIO Y CONTRASEÑA) */
     div[data-testid="stForm"] label p {
-        color: #1F2937 !important;
-        font-weight: 700 !important;
+        color: #E5E7EB !important;
+        font-weight: 600 !important;
         font-size: 13px !important;
     }
 
     div[data-testid="stForm"] div[data-baseweb="input"] {
-        background-color: #F3F4F6 !important;
-        border: 1px solid #D1D5DB !important;
+        background-color: #262A33 !important;
+        border: 1px solid #374151 !important;
         border-radius: 8px !important;
     }
 
     div[data-testid="stForm"] input {
-        color: #111827 !important;
+        color: #FFFFFF !important; /* Texto blanco brillante al escribir */
+        -webkit-text-fill-color: #FFFFFF !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
         background-color: transparent !important;
+    }
+
+    div[data-testid="stForm"] input::placeholder {
+        color: #6B7280 !important;
+        -webkit-text-fill-color: #6B7280 !important;
     }
 
     /* Botón Ojo de la Contraseña */
     div[data-testid="stForm"] button[aria-label="Show password"] {
-        color: #4B5563 !important;
+        color: #9CA3AF !important;
     }
 
     /* Botón Submit Rojo */
@@ -94,17 +107,52 @@ st.markdown("""
         font-size: 14px !important;
         padding: 12px 20px !important;
         width: 100% !important;
-        margin-top: 10px !important;
+        margin-top: 15px !important;
         transition: all 0.2s ease !important;
     }
 
     div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:hover {
-        background-color: #B91C1C !important;
-        box-shadow: 0 4px 12px rgba(230, 28, 36, 0.3) !important;
+        background-color: #CC1219 !important;
+        box-shadow: 0 4px 12px rgba(230, 28, 36, 0.4) !important;
     }
 
     /* ------------------------------------
-       ESTILOS DEL DASHBOARD
+       ESTILOS DE MENÚS DESPLEGABLES (MULTISELECTS Y DESPLEGABLES)
+    ------------------------------------ */
+    /* Popover de Opciones */
+    div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"] {
+        background-color: #1F2937 !important;
+        border: 1px solid #374151 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+    }
+
+    /* Items dentro de las listas */
+    li[role="option"], div[role="option"] {
+        color: #F3F4F6 !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        padding: 8px 12px !important;
+    }
+
+    li[role="option"]:hover, div[role="option"]:hover {
+        background-color: #E61C24 !important;
+        color: #FFFFFF !important;
+    }
+
+    /* Etiquetas seleccionadas en Multiselect */
+    span[data-baseweb="tag"] {
+        background-color: #E61C24 !important;
+        border-radius: 4px !important;
+    }
+    
+    span[data-baseweb="tag"] span {
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+    }
+
+    /* ------------------------------------
+       ESTILOS DEL DASHBOARD PRINCIPAL
     ------------------------------------ */
     section[data-testid="stSidebar"] {
         background-color: #111827 !important;
@@ -124,17 +172,17 @@ st.markdown("""
     .main h1, .main h2, .main h3, .main h4, .main h5,
     div[data-testid="stMarkdownContainer"] h3,
     div[data-testid="stMarkdownContainer"] h4 {
-        color: #111827 !important;
+        color: #FFFFFF !important;
         font-weight: 700 !important;
     }
 
     .main-header {
-        background: linear-gradient(135deg, #111111 0%, #E61C24 100%);
+        background: linear-gradient(135deg, #111827 0%, #E61C24 100%);
         padding: 20px 25px;
         border-radius: 12px;
         color: white;
         margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(230, 28, 36, 0.2);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     }
     .main-header h2 {
         color: #FFFFFF !important;
@@ -150,10 +198,10 @@ st.markdown("""
     }
 
     .custom-card {
-        background-color: #FFFFFF;
+        background-color: #1F2937;
         border-radius: 12px !important;
         padding: 18px 20px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         border-top: 4px solid #E61C24;
         margin-bottom: 15px;
         min-height: 100px;
@@ -164,7 +212,7 @@ st.markdown("""
     .card-title {
         font-size: 12px;
         font-weight: 700;
-        color: #4B5563 !important;
+        color: #9CA3AF !important;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         margin-bottom: 4px;
@@ -172,34 +220,34 @@ st.markdown("""
     .card-value {
         font-size: 20px;
         font-weight: 800;
-        color: #111827 !important;
+        color: #FFFFFF !important;
         margin-bottom: 2px;
     }
     .card-sub {
         font-size: 11px;
         font-weight: 600;
     }
-    .text-red { color: #E61C24 !important; }
+    .text-red { color: #EF4444 !important; }
     .text-green { color: #10B981 !important; }
 
     div[data-testid="stPlotlyChart"] {
-        background-color: #111827 !important;
+        background-color: #1F2937 !important;
         border-radius: 14px !important;
         padding: 10px !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
         overflow: hidden !important;
     }
 
     .detail-popup {
-        background-color: #FEF3C7 !important;
+        background-color: #2A2111 !important;
         border-left: 6px solid #D97706 !important;
         padding: 18px 22px !important;
         border-radius: 12px !important;
         margin: 15px 0 !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
     }
     .detail-popup h5 {
-        color: #B45309 !important;
+        color: #F59E0B !important;
         font-weight: 800 !important;
         margin: 0 0 10px 0 !important;
         font-size: 16px !important;
@@ -207,18 +255,18 @@ st.markdown("""
     .detail-popup p {
         font-size: 15px !important;
         font-weight: 700 !important;
-        color: #0F172A !important;
+        color: #FFFFFF !important;
         margin: 0 !important;
         line-height: 1.5 !important;
     }
     .detail-popup small {
-        color: #374151 !important;
+        color: #D1D5DB !important;
         font-size: 12px !important;
         font-weight: 600 !important;
     }
     .detail-popup hr {
         margin: 12px 0 !important;
-        border-color: #FCD34D !important;
+        border-color: #78350F !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -274,10 +322,21 @@ if not st.session_state['logged_in']:
     
     with col_l2:
         with st.form("login_form"):
-            # Logo Centrado mediante st.columns dentro del formulario
-            col_img1, col_img2, col_img3 = st.columns([1, 1.5, 1])
-            with col_img2:
-                st.image(COCA_COLA_LOGO, use_container_width=True)
+            # BOTELAL ROJA COCA-COLA (SVG VECTORIAL DIRECTO 100% GARANTIZADO)
+            st.markdown("""
+                <div style="text-align: center; margin-bottom: 10px;">
+                    <svg width="42" height="90" viewBox="0 0 100 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Tapa -->
+                        <rect x="38" y="5" width="24" height="12" rx="3" fill="#E61C24" />
+                        <!-- Cuello -->
+                        <path d="M42 17 H58 V45 C58 55 68 65 72 75 C78 90 78 110 74 130 C70 145 68 160 70 180 C73 200 75 220 72 240 C70 255 62 265 50 265 C38 265 30 255 28 240 C25 220 27 200 30 180 C32 160 30 145 26 130 C22 110 22 90 28 75 C32 65 42 55 42 45 Z" fill="#E61C24" />
+                        <!-- Franja Central / Etiqueta -->
+                        <path d="M25 125 C35 120 65 120 75 125 C76 140 75 155 72 170 C62 175 38 175 28 170 C25 155 24 140 25 125 Z" fill="#FFFFFF" opacity="0.9" />
+                        <!-- Detalle Trazos -->
+                        <path d="M32 140 C42 137 58 137 68 140 C65 152 58 158 50 158 C42 158 35 152 32 140 Z" fill="#E61C24" />
+                    </svg>
+                </div>
+            """, unsafe_allow_html=True)
             
             st.markdown('<div class="login-title">Reginald Lee S.A.</div>', unsafe_allow_html=True)
             st.markdown('<div class="login-subtitle">Plataforma de Control Presupuestario</div>', unsafe_allow_html=True)
@@ -438,7 +497,7 @@ if df is not None:
         fig_mes.add_trace(go.Bar(x=comp_mes['MES_NOMBRE'], y=comp_mes['Presupuesto'], name='Presupuesto', marker_color='#9CA3AF'))
         fig_mes.add_trace(go.Bar(x=comp_mes['MES_NOMBRE'], y=comp_mes['Gasto Real'], name='Gasto Real', marker_color='#E61C24'))
         fig_mes.update_layout(
-            paper_bgcolor='#111827', plot_bgcolor='#111827', font=dict(color='#FFFFFF'),
+            paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
             xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
             yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
             barmode='group', height=300, margin=dict(l=15, r=15, t=15, b=15),
@@ -451,7 +510,7 @@ if df is not None:
         g_grupo = gasto_df.groupby('GRUPO DE CUENTAS')['SALDO'].apply(lambda x: abs(x.sum())).reset_index().sort_values(by='SALDO', ascending=True).tail(7)
         fig_grupo = px.bar(g_grupo, x='SALDO', y='GRUPO DE CUENTAS', orientation='h', color_discrete_sequence=['#E61C24'])
         fig_grupo.update_layout(
-            paper_bgcolor='#111827', plot_bgcolor='#111827', font=dict(color='#FFFFFF'),
+            paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
             xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
             yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
             height=300, margin=dict(l=15, r=15, t=15, b=15), xaxis_title="", yaxis_title=""
@@ -475,7 +534,7 @@ if df is not None:
             }
         ))
         fig_gauge.update_layout(
-            paper_bgcolor='#111827', plot_bgcolor='#111827', font=dict(color='#FFFFFF'),
+            paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
             height=300, margin=dict(l=20, r=20, t=20, b=20)
         )
         st.plotly_chart(fig_gauge, use_container_width=True)
@@ -492,7 +551,7 @@ if df is not None:
         )
         fig_loc.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(color='#FFFFFF'))
         fig_loc.update_layout(
-            paper_bgcolor='#111827', plot_bgcolor='#111827', font=dict(color='#FFFFFF'),
+            paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
             height=300, margin=dict(l=15, r=15, t=15, b=15), legend=dict(font=dict(color='#FFFFFF'))
         )
         st.plotly_chart(fig_loc, use_container_width=True)
@@ -510,7 +569,7 @@ if df is not None:
             color='Desviacion', color_continuous_scale=['#6B7280', '#E61C24']
         )
         fig_desv.update_layout(
-            paper_bgcolor='#111827', plot_bgcolor='#111827', font=dict(color='#FFFFFF'),
+            paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
             xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
             yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
             height=300, margin=dict(l=15, r=15, t=15, b=15), xaxis_title="Desviación en $", yaxis_title=""
