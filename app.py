@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# ESTILOS CSS RESPONSIVE, ALTO CONTRASTE Y BORDES REDONDEADOS
+# ESTILOS CSS CORREGIDOS (SIN BLOQUES NEGROS Y CON MÁXIMO CONTRASTE)
 # ---------------------------------------------------------
 st.markdown("""
     <style>
@@ -23,7 +23,7 @@ st.markdown("""
         background-color: #F8F9FA !important;
     }
     
-    /* 1. CORRECCIÓN BARRA LATERAL (SIDEBAR): TEXTOS EN BLANCO Y LEGIBLES */
+    /* 1. BARRA LATERAL (SIDEBAR): TÍTULOS Y TEXTOS EN BLANCO Y LEGIBLES */
     section[data-testid="stSidebar"] {
         background-color: #111827 !important;
     }
@@ -42,18 +42,18 @@ st.markdown("""
         color: #E5E7EB !important;
     }
 
-    /* FORZAR COLOR NEGRO VISIBLE EN TÍTULOS DEL CUERPO PRINCIPAL */
+    /* TÍTULOS PRINCIPALES DE PÁGINA Y SECCIONES */
     .main h1, .main h2, .main h3, .main h4, .main h5,
     div[data-testid="stMarkdownContainer"] h3 {
         color: #111827 !important;
         font-weight: 700 !important;
     }
 
-    /* Header Corporativo Coca-Cola */
+    /* HEADER CORPORATIVO */
     .main-header {
         background: linear-gradient(135deg, #111111 0%, #E61C24 100%);
         padding: 20px 25px;
-        border-radius: 16px; /* Bordes suaves */
+        border-radius: 12px;
         color: white;
         margin-bottom: 20px;
         box-shadow: 0 4px 15px rgba(230, 28, 36, 0.2);
@@ -74,7 +74,7 @@ st.markdown("""
     /* CARDS DE KPI (BORDES SUAVES Y REDONDEADOS) */
     .custom-card {
         background-color: #FFFFFF;
-        border-radius: 16px !important; /* Bordes redondeados */
+        border-radius: 12px !important;
         padding: 18px 20px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         border-top: 4px solid #E61C24;
@@ -105,17 +105,16 @@ st.markdown("""
     .text-red { color: #E61C24 !important; }
     .text-green { color: #10B981 !important; }
 
-    /* 3. BORDES SUAVES Y REDONDEADOS PARA CONTENEDORES DE GRÁFICOS */
-    .chart-container {
-        background-color: #0E1117;
-        border-radius: 16px !important; /* Suaviza bordes a 16px */
-        padding: 10px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        overflow: hidden;
-        margin-bottom: 15px;
+    /* 3. BORDES SUAVES Y REDONDEADOS PARA CONTENEDORES DE GRÁFICOS ST.PLOTLY_CHART */
+    div[data-testid="stPlotlyChart"] {
+        background-color: #111827 !important;
+        border-radius: 14px !important;
+        padding: 10px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+        overflow: hidden !important;
     }
 
-    /* Inspección de Texto Interno */
+    /* POP-UP DETALLE */
     .detail-popup {
         background-color: #FFFBEB;
         border-left: 5px solid #F59E0B;
@@ -123,19 +122,11 @@ st.markdown("""
         border-radius: 12px;
         margin: 15px 0;
     }
-
-    /* RESPONSIVE MÓVIL */
-    @media (max-width: 768px) {
-        .main-header { padding: 15px 18px; }
-        .main-header h2 { font-size: 18px !important; }
-        .custom-card { padding: 12px 15px; }
-        .card-value { font-size: 18px !important; }
-    }
     </style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# FUNCIONES AUXILIARES (FORMATO ARGENTINO $ 10.000,85)
+# FUNCIONES AUXILIARES
 # ---------------------------------------------------------
 def formato_moneda(valor, con_decimales=False):
     if pd.isna(valor):
@@ -147,7 +138,7 @@ def formato_moneda(valor, con_decimales=False):
     return "$ " + res.replace(',', 'X').replace('.', ',').replace('X', '.')
 
 # ---------------------------------------------------------
-# CARGA Y PROCESAMIENTO DE DATOS
+# CARGA DE DATOS Y ESTADO DE SESIÓN
 # ---------------------------------------------------------
 @st.cache_data
 def cargar_datos(file):
@@ -180,7 +171,7 @@ if 'df_data' not in st.session_state:
     st.session_state['df_data'] = obtener_base_inicial()
 
 # ---------------------------------------------------------
-# MÓDULO DE LOGIN
+# LOGIN
 # ---------------------------------------------------------
 if not st.session_state['logged_in']:
     col_l1, col_l2, col_l3 = st.columns([1, 1.4, 1])
@@ -226,11 +217,11 @@ if not st.session_state['logged_in']:
     st.stop()
 
 # ---------------------------------------------------------
-# DASHBOARD DE GESTIÓN (SESIÓN INICIADA)
+# MAIN DASHBOARD
 # ---------------------------------------------------------
 df = st.session_state['df_data']
 
-# Sidebar con estilos claros
+# Sidebar
 st.sidebar.markdown(f"👤 **Usuario Activo:** `{st.session_state['user']}`")
 if st.session_state['is_admin']:
     st.sidebar.caption("🔑 Perfil: Administrador General")
@@ -245,7 +236,6 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
 
 st.sidebar.markdown("---")
 
-# Carga exclusiva Administrador
 if st.session_state['is_admin']:
     st.sidebar.subheader("📤 Actualizar Base de Datos")
     new_file = st.sidebar.file_uploader("Subir Excel Principal", type=["xlsx"])
@@ -263,7 +253,6 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 if df is not None:
-    # Seguridad por Usuario
     if not st.session_state['is_admin']:
         df_user = df[df['RESPONSABLE'].astype(str).str.upper() == st.session_state['user']]
     else:
@@ -302,7 +291,7 @@ if df is not None:
     pct_ejecucion = (tot_gasto / tot_presupuesto * 100) if tot_presupuesto > 0 else 0
 
     # ---------------------------------------------------------
-    # 1. CARDS DE KPI (BORDES REDONDEADOS)
+    # TARJETAS DE KPI
     # ---------------------------------------------------------
     k1, k2, k3, k4 = st.columns(4)
 
@@ -342,12 +331,12 @@ if df is not None:
         """, unsafe_allow_html=True)
 
     # ---------------------------------------------------------
-    # 2. PRIMERA FILA DE GRÁFICOS (BORDES SUAVES Y % EN BLANCO)
+    # PRIMERA FILA DE GRÁFICOS
     # ---------------------------------------------------------
     col_g1, col_g2, col_g3 = st.columns([1.5, 1.2, 1])
 
     with col_g1:
-        st.markdown("<h3 style='color: #111827 !important; margin-bottom: 10px;'>📅 Presupuesto vs Real por Mes</h3>", unsafe_allow_html=True)
+        st.markdown("### 📅 Presupuesto vs Real por Mes")
         p_mes = presupuesto_df.groupby('MES_NOMBRE')['SALDO'].sum().reset_index().rename(columns={'SALDO': 'Presupuesto'})
         g_mes = gasto_df.groupby('MES_NOMBRE')['SALDO'].apply(lambda x: abs(x.sum())).reset_index().rename(columns={'SALDO': 'Gasto Real'})
         comp_mes = pd.merge(p_mes, g_mes, on='MES_NOMBRE', how='outer').fillna(0)
@@ -356,45 +345,45 @@ if df is not None:
         fig_mes.add_trace(go.Bar(x=comp_mes['MES_NOMBRE'], y=comp_mes['Presupuesto'], name='Presupuesto', marker_color='#9CA3AF'))
         fig_mes.add_trace(go.Bar(x=comp_mes['MES_NOMBRE'], y=comp_mes['Gasto Real'], name='Gasto Real', marker_color='#E61C24'))
         fig_mes.update_layout(
-            template='plotly_dark',
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='#111827',
+            plot_bgcolor='#111827',
+            font=dict(color='#FFFFFF'),
+            xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
+            yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
             barmode='group',
-            height=310,
-            margin=dict(l=10, r=10, t=10, b=10),
-            legend=dict(orientation="h", y=1.15)
+            height=300,
+            margin=dict(l=15, r=15, t=15, b=15),
+            legend=dict(orientation="h", y=1.15, font=dict(color='#FFFFFF'))
         )
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.plotly_chart(fig_mes, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
 
     with col_g2:
-        st.markdown("<h3 style='color: #111827 !important; margin-bottom: 10px;'>📊 Gasto por Grupo de Cuentas</h3>", unsafe_allow_html=True)
+        st.markdown("### 📊 Gasto por Grupo de Cuentas")
         g_grupo = gasto_df.groupby('GRUPO DE CUENTAS')['SALDO'].apply(lambda x: abs(x.sum())).reset_index().sort_values(by='SALDO', ascending=True).tail(7)
         fig_grupo = px.bar(g_grupo, x='SALDO', y='GRUPO DE CUENTAS', orientation='h', color_discrete_sequence=['#E61C24'])
         fig_grupo.update_layout(
-            template='plotly_dark',
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            height=310,
-            margin=dict(l=10, r=10, t=10, b=10),
+            paper_bgcolor='#111827',
+            plot_bgcolor='#111827',
+            font=dict(color='#FFFFFF'),
+            xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
+            yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
+            height=300,
+            margin=dict(l=15, r=15, t=15, b=15),
             xaxis_title="",
             yaxis_title=""
         )
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.plotly_chart(fig_grupo, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
 
     with col_g3:
-        st.markdown("<h3 style='color: #111827 !important; margin-bottom: 10px;'>🎯 Nivel de Ejecución</h3>", unsafe_allow_html=True)
+        st.markdown("### 🎯 Nivel de Ejecución")
         fig_gauge = go.Figure(go.Indicator(
             mode = "gauge+number",
             value = pct_ejecucion,
-            # FUENTE DEL % CAMBIADA A BLANCO BRILLANTE (#FFFFFF)
-            number = {'suffix': "%", 'font': {'size': 26, 'color': '#FFFFFF', 'family': 'Arial'}},
+            # NÚMERO / PORCENTAJE TOTALMENTE BLANCO Y DESTACADO
+            number = {'suffix': "%", 'font': {'size': 28, 'color': '#FFFFFF', 'family': 'Arial'}},
             gauge = {
-                'axis': {'range': [0, max(120, pct_ejecucion)], 'tickcolor': "#FFFFFF"},
-                'bar': {'color': "#E61C24" if pct_ejecucion > 100 else "#6B7280"},
+                'axis': {'range': [0, max(120, pct_ejecucion)], 'tickcolor': "#FFFFFF", 'tickfont': {'color': '#FFFFFF'}},
+                'bar': {'color': "#E61C24" if pct_ejecucion > 100 else "#9CA3AF"},
                 'steps': [
                     {'range': [0, 80], 'color': "#374151"},
                     {'range': [80, 100], 'color': "#4B5563"},
@@ -403,42 +392,39 @@ if df is not None:
             }
         ))
         fig_gauge.update_layout(
-            template='plotly_dark',
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            height=310,
-            margin=dict(l=15, r=15, t=15, b=15)
+            paper_bgcolor='#111827',
+            plot_bgcolor='#111827',
+            font=dict(color='#FFFFFF'),
+            height=300,
+            margin=dict(l=20, r=20, t=20, b=20)
         )
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.plotly_chart(fig_gauge, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
 
     # ---------------------------------------------------------
-    # 3. SEGUNDA FILA DE GRÁFICOS
+    # SEGUNDA FILA DE GRÁFICOS
     # ---------------------------------------------------------
     c_r2_1, c_r2_2 = st.columns([1, 1.5])
 
     with c_r2_1:
-        st.markdown("<h3 style='color: #111827 !important; margin-bottom: 10px;'>🏢 Gastos por Locación</h3>", unsafe_allow_html=True)
+        st.markdown("### 🏢 Gastos por Locación")
         g_loc = gasto_df.groupby('LOCACION')['SALDO'].apply(lambda x: abs(x.sum())).reset_index()
         fig_loc = px.pie(
             g_loc, values='SALDO', names='LOCACION', hole=0.4,
-            color_discrete_sequence=['#E61C24', '#4B5563', '#9CA3AF', '#D1D5DB', '#F3F4F6']
+            color_discrete_sequence=['#E61C24', '#6B7280', '#9CA3AF', '#D1D5DB', '#374151']
         )
-        fig_loc.update_traces(textposition='inside', textinfo='percent+label')
+        fig_loc.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(color='#FFFFFF'))
         fig_loc.update_layout(
-            template='plotly_dark',
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            height=310,
-            margin=dict(l=10, r=10, t=10, b=10)
+            paper_bgcolor='#111827',
+            plot_bgcolor='#111827',
+            font=dict(color='#FFFFFF'),
+            height=300,
+            margin=dict(l=15, r=15, t=15, b=15),
+            legend=dict(font=dict(color='#FFFFFF'))
         )
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.plotly_chart(fig_loc, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
 
     with c_r2_2:
-        st.markdown("<h3 style='color: #111827 !important; margin-bottom: 10px;'>⚠️ Cuentas con Mayor Desviación</h3>", unsafe_allow_html=True)
+        st.markdown("### ⚠️ Cuentas con Mayor Desviación")
         p_cta = presupuesto_df.groupby('DESC CTA CBLE')['SALDO'].sum().rename('Presupuesto')
         g_cta = gasto_df.groupby('DESC CTA CBLE')['SALDO'].apply(lambda x: abs(x.sum())).rename('Gasto Real')
         comp_cta = pd.concat([p_cta, g_cta], axis=1).fillna(0)
@@ -447,30 +433,29 @@ if df is not None:
 
         fig_desv = px.bar(
             top_desv, x='Desviacion', y='DESC CTA CBLE', orientation='h',
-            color='Desviacion', color_continuous_scale=['#4B5563', '#E61C24']
+            color='Desviacion', color_continuous_scale=['#6B7280', '#E61C24']
         )
         fig_desv.update_layout(
-            template='plotly_dark',
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            height=310,
-            margin=dict(l=10, r=10, t=10, b=10),
+            paper_bgcolor='#111827',
+            plot_bgcolor='#111827',
+            font=dict(color='#FFFFFF'),
+            xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
+            yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF')),
+            height=300,
+            margin=dict(l=15, r=15, t=15, b=15),
             xaxis_title="Desviación en $",
             yaxis_title=""
         )
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.plotly_chart(fig_desv, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
 
     # ---------------------------------------------------------
-    # 4. TABLA TRANSACCIONAL DE GASTOS
+    # TABLA TRANSACCIONAL DE GASTOS
     # ---------------------------------------------------------
     st.markdown("---")
-    st.markdown("<h3 style='color: #111827 !important;'>🔍 Consulta y Auditoría Transaccional de Gastos</h3>", unsafe_allow_html=True)
+    st.markdown("### 🔍 Consulta y Auditoría Transaccional de Gastos")
 
     df_auditoria = gasto_df.copy()
 
-    # MULTISELECT CUENTAS Y BÚSQUEDA
     cuentas_unicas = sorted(df_auditoria['DESC CTA CBLE'].dropna().unique())
     col_f1, col_f2 = st.columns([2, 1])
     
@@ -491,7 +476,6 @@ if df is not None:
         )
         df_auditoria = df_auditoria[mask]
 
-    # Inversión de signo
     df_auditoria['MONTO_MOSTRAR'] = df_auditoria['SALDO'] * -1
     df_auditoria['MONTO_FORMATO'] = df_auditoria['MONTO_MOSTRAR'].apply(lambda v: formato_moneda(v, con_decimales=True))
 
@@ -515,9 +499,9 @@ if df is not None:
     )
 
     # ---------------------------------------------------------
-    # INSPECTOR DE TEXTO INTERNO (POP-UP DETALLE)
+    # INSPECTOR DE TEXTO INTERNO
     # ---------------------------------------------------------
-    st.markdown("<h4 style='color: #111827 !important; margin-top: 15px;'>📌 Inspeccionar 'Texto Interno' de un Gasto Específico</h4>", unsafe_allow_html=True)
+    st.markdown("#### 📌 Inspeccionar 'Texto Interno' de un Gasto Específico")
     
     if not df_auditoria.empty:
         opciones_inspeccion = df_auditoria.apply(
