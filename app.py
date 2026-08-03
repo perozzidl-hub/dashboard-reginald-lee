@@ -14,20 +14,37 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# ESTILOS CSS RESPONSIVE Y ALTO CONTRASTE
+# ESTILOS CSS RESPONSIVE, ALTO CONTRASTE Y BORDES REDONDEADOS
 # ---------------------------------------------------------
 st.markdown("""
     <style>
-    /* Fondo General */
+    /* Fondo General de la App */
     .stApp {
         background-color: #F8F9FA !important;
     }
     
-    /* FORZAR COLOR NEGRO VISIBLE EN TODOS LOS TÍTULOS Y SUBTÍTULOS DE STREAMLIT */
-    h1, h2, h3, h4, h5, h6, 
-    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4, .stMarkdown h5,
-    div[data-testid="stMarkdownContainer"] h3,
-    div[data-testid="stMarkdownContainer"] p {
+    /* 1. CORRECCIÓN BARRA LATERAL (SIDEBAR): TEXTOS EN BLANCO Y LEGIBLES */
+    section[data-testid="stSidebar"] {
+        background-color: #111827 !important;
+    }
+    section[data-testid="stSidebar"] h1, 
+    section[data-testid="stSidebar"] h2, 
+    section[data-testid="stSidebar"] h3, 
+    section[data-testid="stSidebar"] h4, 
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] span {
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+    }
+    section[data-testid="stSidebar"] .stMultiSelect label,
+    section[data-testid="stSidebar"] .stSelectbox label {
+        color: #E5E7EB !important;
+    }
+
+    /* FORZAR COLOR NEGRO VISIBLE EN TÍTULOS DEL CUERPO PRINCIPAL */
+    .main h1, .main h2, .main h3, .main h4, .main h5,
+    div[data-testid="stMarkdownContainer"] h3 {
         color: #111827 !important;
         font-weight: 700 !important;
     }
@@ -36,7 +53,7 @@ st.markdown("""
     .main-header {
         background: linear-gradient(135deg, #111111 0%, #E61C24 100%);
         padding: 20px 25px;
-        border-radius: 12px;
+        border-radius: 16px; /* Bordes suaves */
         color: white;
         margin-bottom: 20px;
         box-shadow: 0 4px 15px rgba(230, 28, 36, 0.2);
@@ -54,12 +71,12 @@ st.markdown("""
         margin-bottom: 0;
     }
 
-    /* CARDS DE KPI (RESPONSIVE) */
+    /* CARDS DE KPI (BORDES SUAVES Y REDONDEADOS) */
     .custom-card {
         background-color: #FFFFFF;
-        border-radius: 12px;
-        padding: 16px 20px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+        border-radius: 16px !important; /* Bordes redondeados */
+        padding: 18px 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         border-top: 4px solid #E61C24;
         margin-bottom: 15px;
         min-height: 100px;
@@ -88,37 +105,31 @@ st.markdown("""
     .text-red { color: #E61C24 !important; }
     .text-green { color: #10B981 !important; }
 
+    /* 3. BORDES SUAVES Y REDONDEADOS PARA CONTENEDORES DE GRÁFICOS */
+    .chart-container {
+        background-color: #0E1117;
+        border-radius: 16px !important; /* Suaviza bordes a 16px */
+        padding: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        overflow: hidden;
+        margin-bottom: 15px;
+    }
+
     /* Inspección de Texto Interno */
     .detail-popup {
         background-color: #FFFBEB;
         border-left: 5px solid #F59E0B;
         padding: 15px 20px;
-        border-radius: 8px;
+        border-radius: 12px;
         margin: 15px 0;
     }
 
-    /* AJUSTES RESPONSIVE PARA DISPOSITIVOS MÓVILES (TELÉFONOS Y TABLETS) */
+    /* RESPONSIVE MÓVIL */
     @media (max-width: 768px) {
-        .main-header {
-            padding: 15px 18px;
-        }
-        .main-header h2 {
-            font-size: 18px !important;
-        }
-        .main-header p {
-            font-size: 12px !important;
-        }
-        .custom-card {
-            padding: 12px 15px;
-            min-height: auto;
-        }
-        .card-value {
-            font-size: 18px !important;
-        }
-        /* Ajustar espaciado de los bloques en celular */
-        div[data-testid="column"] {
-            margin-bottom: 10px;
-        }
+        .main-header { padding: 15px 18px; }
+        .main-header h2 { font-size: 18px !important; }
+        .custom-card { padding: 12px 15px; }
+        .card-value { font-size: 18px !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -219,7 +230,7 @@ if not st.session_state['logged_in']:
 # ---------------------------------------------------------
 df = st.session_state['df_data']
 
-# Sidebar
+# Sidebar con estilos claros
 st.sidebar.markdown(f"👤 **Usuario Activo:** `{st.session_state['user']}`")
 if st.session_state['is_admin']:
     st.sidebar.caption("🔑 Perfil: Administrador General")
@@ -291,9 +302,9 @@ if df is not None:
     pct_ejecucion = (tot_gasto / tot_presupuesto * 100) if tot_presupuesto > 0 else 0
 
     # ---------------------------------------------------------
-    # 1. CARDS DE KPI (ADAPTATIVAS EN TELÉFONOS/TABLETS)
+    # 1. CARDS DE KPI (BORDES REDONDEADOS)
     # ---------------------------------------------------------
-    k1, k2, k3, k4 = st.columns([1, 1, 1, 1])
+    k1, k2, k3, k4 = st.columns(4)
 
     with k1:
         st.markdown(f"""
@@ -331,7 +342,7 @@ if df is not None:
         """, unsafe_allow_html=True)
 
     # ---------------------------------------------------------
-    # 2. PRIMERA FILA DE GRÁFICOS (TÍTULOS CON NEGRO INTENSO)
+    # 2. PRIMERA FILA DE GRÁFICOS (BORDES SUAVES Y % EN BLANCO)
     # ---------------------------------------------------------
     col_g1, col_g2, col_g3 = st.columns([1.5, 1.2, 1])
 
@@ -342,36 +353,65 @@ if df is not None:
         comp_mes = pd.merge(p_mes, g_mes, on='MES_NOMBRE', how='outer').fillna(0)
 
         fig_mes = go.Figure()
-        fig_mes.add_trace(go.Bar(x=comp_mes['MES_NOMBRE'], y=comp_mes['Presupuesto'], name='Presupuesto', marker_color='#1E1E1E'))
+        fig_mes.add_trace(go.Bar(x=comp_mes['MES_NOMBRE'], y=comp_mes['Presupuesto'], name='Presupuesto', marker_color='#9CA3AF'))
         fig_mes.add_trace(go.Bar(x=comp_mes['MES_NOMBRE'], y=comp_mes['Gasto Real'], name='Gasto Real', marker_color='#E61C24'))
-        fig_mes.update_layout(barmode='group', template='plotly_white', height=310, margin=dict(l=10, r=10, t=10, b=10), legend=dict(orientation="h", y=1.15))
+        fig_mes.update_layout(
+            template='plotly_dark',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            barmode='group',
+            height=310,
+            margin=dict(l=10, r=10, t=10, b=10),
+            legend=dict(orientation="h", y=1.15)
+        )
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.plotly_chart(fig_mes, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col_g2:
         st.markdown("<h3 style='color: #111827 !important; margin-bottom: 10px;'>📊 Gasto por Grupo de Cuentas</h3>", unsafe_allow_html=True)
         g_grupo = gasto_df.groupby('GRUPO DE CUENTAS')['SALDO'].apply(lambda x: abs(x.sum())).reset_index().sort_values(by='SALDO', ascending=True).tail(7)
         fig_grupo = px.bar(g_grupo, x='SALDO', y='GRUPO DE CUENTAS', orientation='h', color_discrete_sequence=['#E61C24'])
-        fig_grupo.update_layout(template='plotly_white', height=310, margin=dict(l=10, r=10, t=10, b=10), xaxis_title="", yaxis_title="")
+        fig_grupo.update_layout(
+            template='plotly_dark',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            height=310,
+            margin=dict(l=10, r=10, t=10, b=10),
+            xaxis_title="",
+            yaxis_title=""
+        )
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.plotly_chart(fig_grupo, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col_g3:
         st.markdown("<h3 style='color: #111827 !important; margin-bottom: 10px;'>🎯 Nivel de Ejecución</h3>", unsafe_allow_html=True)
         fig_gauge = go.Figure(go.Indicator(
             mode = "gauge+number",
             value = pct_ejecucion,
-            number = {'suffix': "%", 'font': {'size': 24, 'color': '#111827'}},
+            # FUENTE DEL % CAMBIADA A BLANCO BRILLANTE (#FFFFFF)
+            number = {'suffix': "%", 'font': {'size': 26, 'color': '#FFFFFF', 'family': 'Arial'}},
             gauge = {
-                'axis': {'range': [0, max(120, pct_ejecucion)]},
-                'bar': {'color': "#E61C24" if pct_ejecucion > 100 else "#1E1E1E"},
+                'axis': {'range': [0, max(120, pct_ejecucion)], 'tickcolor': "#FFFFFF"},
+                'bar': {'color': "#E61C24" if pct_ejecucion > 100 else "#6B7280"},
                 'steps': [
-                    {'range': [0, 80], 'color': "#E5E7EB"},
-                    {'range': [80, 100], 'color': "#D1D5DB"},
-                    {'range': [100, max(120, pct_ejecucion)], 'color': "#FCA5A5"}
+                    {'range': [0, 80], 'color': "#374151"},
+                    {'range': [80, 100], 'color': "#4B5563"},
+                    {'range': [100, max(120, pct_ejecucion)], 'color': "#991B1B"}
                 ]
             }
         ))
-        fig_gauge.update_layout(height=310, margin=dict(l=15, r=15, t=15, b=15))
+        fig_gauge.update_layout(
+            template='plotly_dark',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            height=310,
+            margin=dict(l=15, r=15, t=15, b=15)
+        )
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.plotly_chart(fig_gauge, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # ---------------------------------------------------------
     # 3. SEGUNDA FILA DE GRÁFICOS
@@ -383,11 +423,19 @@ if df is not None:
         g_loc = gasto_df.groupby('LOCACION')['SALDO'].apply(lambda x: abs(x.sum())).reset_index()
         fig_loc = px.pie(
             g_loc, values='SALDO', names='LOCACION', hole=0.4,
-            color_discrete_sequence=['#E61C24', '#1E1E1E', '#7F1D1D', '#9CA3AF', '#D1D5DB']
+            color_discrete_sequence=['#E61C24', '#4B5563', '#9CA3AF', '#D1D5DB', '#F3F4F6']
         )
         fig_loc.update_traces(textposition='inside', textinfo='percent+label')
-        fig_loc.update_layout(height=310, margin=dict(l=10, r=10, t=10, b=10))
+        fig_loc.update_layout(
+            template='plotly_dark',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            height=310,
+            margin=dict(l=10, r=10, t=10, b=10)
+        )
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.plotly_chart(fig_loc, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with c_r2_2:
         st.markdown("<h3 style='color: #111827 !important; margin-bottom: 10px;'>⚠️ Cuentas con Mayor Desviación</h3>", unsafe_allow_html=True)
@@ -399,10 +447,20 @@ if df is not None:
 
         fig_desv = px.bar(
             top_desv, x='Desviacion', y='DESC CTA CBLE', orientation='h',
-            color='Desviacion', color_continuous_scale=['#1E1E1E', '#E61C24']
+            color='Desviacion', color_continuous_scale=['#4B5563', '#E61C24']
         )
-        fig_desv.update_layout(template='plotly_white', height=310, margin=dict(l=10, r=10, t=10, b=10), xaxis_title="Desviación en $", yaxis_title="")
+        fig_desv.update_layout(
+            template='plotly_dark',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            height=310,
+            margin=dict(l=10, r=10, t=10, b=10),
+            xaxis_title="Desviación en $",
+            yaxis_title=""
+        )
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.plotly_chart(fig_desv, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # ---------------------------------------------------------
     # 4. TABLA TRANSACCIONAL DE GASTOS
