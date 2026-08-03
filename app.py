@@ -4,7 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # ---------------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA Y ESTILOS
+# CONFIGURACIÓN DE PÁGINA Y ESTILOS NATIVOS
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Reginald Lee - Dashboard Presupuestario",
@@ -13,22 +13,22 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS de Alta Definición y Alto Contraste
+# Estilos CSS limpios y libres de conflictos
 st.markdown("""
     <style>
     /* Fondo General */
     .stApp {
-        background-color: #F4F6F9;
+        background-color: #F8F9FA !important;
     }
     
-    /* Header Corporativo */
+    /* Header Corporativo Coca-Cola */
     .main-header {
         background: linear-gradient(135deg, #111111 0%, #E61C24 100%);
-        padding: 20px 25px;
-        border-radius: 12px;
+        padding: 22px 30px;
+        border-radius: 14px;
         color: white;
         margin-bottom: 25px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 4px 15px rgba(230, 28, 36, 0.2);
     }
     .main-header h2 {
         color: #FFFFFF !important;
@@ -38,66 +38,87 @@ st.markdown("""
     }
     .main-header p {
         margin-top: 5px;
-        color: #E5E7EB !important;
+        color: #F3F4F6 !important;
         font-size: 14px;
+        margin-bottom: 0;
     }
 
-    /* FORZAR VISIBILIDAD Y ALTO CONTRASTE EN MÉTRICAS Y TEXTOS */
-    div[data-testid="stMetric"] {
-        background-color: #FFFFFF !important;
-        padding: 16px 20px !important;
-        border-radius: 12px !important;
-        border-top: 4px solid #E61C24 !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08) !important;
+    /* CARDS PERSONALIZADAS CON CONTROL TOTAL DE ALINEACIÓN Y CONTRASTE */
+    .custom-card {
+        background-color: #FFFFFF;
+        border-radius: 12px;
+        padding: 18px 22px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+        border-top: 5px solid #E61C24;
+        margin-bottom: 20px;
+        min-height: 110px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
-    
-    /* Etiquetas / Títulos de las Métricas */
-    div[data-testid="stMetricLabel"] label, div[data-testid="stMetricLabel"] div {
-        color: #374151 !important;
-        font-weight: 700 !important;
-        font-size: 14px !important;
+    .card-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #4B5563;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
     }
-    
-    /* Valor numérico de las Métricas */
-    div[data-testid="stMetricValue"] div {
-        color: #111827 !important;
-        font-size: 22px !important;
-        font-weight: 800 !important;
+    .card-value {
+        font-size: 22px;
+        font-weight: 800;
+        color: #111827;
+        margin-bottom: 2px;
     }
+    .card-sub {
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .text-red { color: #E61C24; }
+    .text-green { color: #10B981; }
 
-    /* Titulares de Secciones */
-    .section-title {
-        color: #111827 !important;
-        font-size: 18px !important;
-        font-weight: 700 !important;
-        margin-bottom: 15px !important;
+    /* Tarjetas para Gráficos */
+    .chart-card {
+        background-color: #FFFFFF;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        margin-bottom: 25px;
+        border: 1px solid #E5E7EB;
+    }
+    .chart-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #111827;
+        margin-bottom: 15px;
         display: flex;
         align-items: center;
         gap: 8px;
     }
 
-    /* Cards Visuales Contenedoras de Gráficos */
-    .chart-card {
-        background-color: #FFFFFF;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-        margin-bottom: 20px;
-        border: 1px solid #E5E7EB;
-    }
-
-    /* Pop-up / Tarjeta de Inspección de Texto Interno */
+    /* Inspección de Texto Interno */
     .detail-popup {
         background-color: #FFFBEB;
-        border-left: 6px solid #F59E0B;
+        border-left: 5px solid #F59E0B;
         padding: 15px 20px;
         border-radius: 8px;
-        margin-top: 15px;
-        margin-bottom: 15px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        margin: 15px 0;
     }
     </style>
 """, unsafe_allow_html=True)
+
+# ---------------------------------------------------------
+# FUNCIONES AUXILIARES (FORMATO ARGENTINO $ 10.000,85)
+# ---------------------------------------------------------
+def formato_moneda(valor, con_decimales=False):
+    if pd.isna(valor):
+        return "$ 0"
+    if con_decimales:
+        res = f"{valor:,.2f}"
+    else:
+        res = f"{valor:,.0f}"
+    # Intercambiar coma por punto para miles y punto por coma para decimales
+    return "$ " + res.replace(',', 'X').replace('.', ',').replace('X', '.')
 
 # ---------------------------------------------------------
 # CARGA Y PROCESAMIENTO DE DATOS
@@ -133,7 +154,7 @@ if 'df_data' not in st.session_state:
     st.session_state['df_data'] = obtener_base_inicial()
 
 # ---------------------------------------------------------
-# AUTENTICACIÓN (LOGIN)
+# MÓDULO DE LOGIN
 # ---------------------------------------------------------
 if not st.session_state['logged_in']:
     col_l1, col_l2, col_l3 = st.columns([1, 1.4, 1])
@@ -186,7 +207,7 @@ df = st.session_state['df_data']
 # Sidebar
 st.sidebar.markdown(f"👤 **Usuario Activo:** `{st.session_state['user']}`")
 if st.session_state['is_admin']:
-    st.sidebar.caption("🔑 Perfil: Administrador")
+    st.sidebar.caption("🔑 Perfil: Administrador General")
 else:
     st.sidebar.caption("📊 Perfil: Responsable de Sector")
 
@@ -198,14 +219,14 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
 
 st.sidebar.markdown("---")
 
-# Carga exclusiva para Administrador
+# Carga exclusiva Administrador
 if st.session_state['is_admin']:
-    st.sidebar.subheader("📤 Carga de Datos")
-    new_file = st.sidebar.file_uploader("Actualizar Excel Principal", type=["xlsx"])
+    st.sidebar.subheader("📤 Actualizar Base de Datos")
+    new_file = st.sidebar.file_uploader("Subir Excel Principal", type=["xlsx"])
     if new_file is not None:
         st.session_state['df_data'] = cargar_datos(new_file)
         df = st.session_state['df_data']
-        st.sidebar.success("✅ Datos actualizados correctamente")
+        st.sidebar.success("✅ Base de datos actualizada")
 
 # Header Principal
 st.markdown(f"""
@@ -216,13 +237,13 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 if df is not None:
-    # Filtro de Seguridad por Responsable
+    # Seguridad por Usuario
     if not st.session_state['is_admin']:
         df_user = df[df['RESPONSABLE'].astype(str).str.upper() == st.session_state['user']]
     else:
         df_user = df.copy()
 
-    # Filtros Globales
+    # Filtros Barra Lateral
     st.sidebar.subheader("🎯 Filtros Generales")
     meses_disponibles = sorted(df_user['MES_NOMBRE'].dropna().unique())
     locaciones_disponibles = sorted(df_user['LOCACION'].dropna().unique())
@@ -238,7 +259,7 @@ if df is not None:
     else:
         f_resp = [st.session_state['user']]
 
-    # Aplicar Filtros Generales
+    # Dataset Filtrado
     df_f = df_user[
         (df_user['MES_NOMBRE'].isin(f_mes)) &
         (df_user['LOCACION'].isin(f_loc)) &
@@ -250,29 +271,58 @@ if df is not None:
     gasto_df = df_f[df_f['TIPO2'] == 'GASTO']
 
     tot_presupuesto = presupuesto_df['SALDO'].sum()
-    tot_gasto = abs(gasto_df['SALDO'].sum())  # Valor absoluto para visualización clara
+    tot_gasto = abs(gasto_df['SALDO'].sum())
     desviacion = tot_gasto - tot_presupuesto
     pct_ejecucion = (tot_gasto / tot_presupuesto * 100) if tot_presupuesto > 0 else 0
 
     # ---------------------------------------------------------
-    # 1. TARJETAS DE KPIs (CON ALTO CONTRASTE Y FORMATO LIMPIO)
+    # 1. CARDS DE KPI TOTALMENTE HIGIENIZADAS Y VISIBLES (HTML/CSS)
     # ---------------------------------------------------------
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Presupuesto Asignado", f"$ {tot_presupuesto:,.0f}")
-    k2.metric("Gasto Real Ejecutado", f"$ {tot_gasto:,.0f}")
-    k3.metric("Desviación Presupuestaria", f"$ {desviacion:,.0f}", delta=f"$ {desviacion:,.0f}", delta_color="inverse")
-    k4.metric("% Ejecución Presupuestaria", f"{pct_ejecucion:.1f}%")
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    with k1:
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="card-title">Presupuesto Asignado</div>
+                <div class="card-value">{formato_moneda(tot_presupuesto)}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with k2:
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="card-title">Gasto Real Ejecutado</div>
+                <div class="card-value">{formato_moneda(tot_gasto)}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with k3:
+        sub_color = "text-red" if desviacion > 0 else "text-green"
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="card-title">Desviación Presupuestaria</div>
+                <div class="card-value">{formato_moneda(desviacion)}</div>
+                <div class="card-sub {sub_color}">Diferencia acumulada</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with k4:
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="card-title">% Ejecución Presupuestaria</div>
+                <div class="card-value">{pct_ejecucion:.1f}%</div>
+                <div class="card-sub text-red" style="visibility: {'visible' if pct_ejecucion > 100 else 'hidden'};">Excedido de Presupuesto</div>
+            </div>
+        """, unsafe_allow_html=True)
 
     # ---------------------------------------------------------
-    # 2. SECCIÓN PRINCIPAL DE GRÁFICOS (GRID BI)
+    # 2. SECCIÓN PRINCIPAL DE GRÁFICOS (ALINEACIÓN LIMPIA)
     # ---------------------------------------------------------
     col_g1, col_g2, col_g3 = st.columns([1.5, 1.2, 1])
 
     with col_g1:
         st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">📅 Presupuesto vs Real por Mes</div>', unsafe_allow_html=True)
+        st.markdown('<div class="chart-title">📅 Presupuesto vs Real por Mes</div>', unsafe_allow_html=True)
         p_mes = presupuesto_df.groupby('MES_NOMBRE')['SALDO'].sum().reset_index().rename(columns={'SALDO': 'Presupuesto'})
         g_mes = gasto_df.groupby('MES_NOMBRE')['SALDO'].apply(lambda x: abs(x.sum())).reset_index().rename(columns={'SALDO': 'Gasto Real'})
         comp_mes = pd.merge(p_mes, g_mes, on='MES_NOMBRE', how='outer').fillna(0)
@@ -280,22 +330,22 @@ if df is not None:
         fig_mes = go.Figure()
         fig_mes.add_trace(go.Bar(x=comp_mes['MES_NOMBRE'], y=comp_mes['Presupuesto'], name='Presupuesto', marker_color='#1E1E1E'))
         fig_mes.add_trace(go.Bar(x=comp_mes['MES_NOMBRE'], y=comp_mes['Gasto Real'], name='Gasto Real', marker_color='#E61C24'))
-        fig_mes.update_layout(barmode='group', template='plotly_white', height=290, margin=dict(l=10, r=10, t=10, b=10), legend=dict(orientation="h", y=1.1))
+        fig_mes.update_layout(barmode='group', template='plotly_white', height=280, margin=dict(l=10, r=10, t=10, b=10), legend=dict(orientation="h", y=1.15))
         st.plotly_chart(fig_mes, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col_g2:
         st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">📊 Gasto por Grupo de Cuentas</div>', unsafe_allow_html=True)
+        st.markdown('<div class="chart-title">📊 Gasto por Grupo de Cuentas</div>', unsafe_allow_html=True)
         g_grupo = gasto_df.groupby('GRUPO DE CUENTAS')['SALDO'].apply(lambda x: abs(x.sum())).reset_index().sort_values(by='SALDO', ascending=True).tail(7)
         fig_grupo = px.bar(g_grupo, x='SALDO', y='GRUPO DE CUENTAS', orientation='h', color_discrete_sequence=['#E61C24'])
-        fig_grupo.update_layout(template='plotly_white', height=290, margin=dict(l=10, r=10, t=10, b=10), xaxis_title="", yaxis_title="")
+        fig_grupo.update_layout(template='plotly_white', height=280, margin=dict(l=10, r=10, t=10, b=10), xaxis_title="", yaxis_title="")
         st.plotly_chart(fig_grupo, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col_g3:
         st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">🎯 Nivel de Ejecución</div>', unsafe_allow_html=True)
+        st.markdown('<div class="chart-title">🎯 Nivel de Ejecución</div>', unsafe_allow_html=True)
         fig_gauge = go.Figure(go.Indicator(
             mode = "gauge+number",
             value = pct_ejecucion,
@@ -310,31 +360,31 @@ if df is not None:
                 ]
             }
         ))
-        fig_gauge.update_layout(height=290, margin=dict(l=20, r=20, t=20, b=20))
+        fig_gauge.update_layout(height=280, margin=dict(l=15, r=15, t=15, b=15))
         st.plotly_chart(fig_gauge, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     # ---------------------------------------------------------
-    # 3. SEGUNDA FILA: LOCACIÓN Y TOP DESVIACIONES
+    # 3. SEGUNDA FILA DE GRÁFICOS
     # ---------------------------------------------------------
     c_r2_1, c_r2_2 = st.columns([1, 1.5])
 
     with c_r2_1:
         st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">🏢 Gastos por Locación</div>', unsafe_allow_html=True)
+        st.markdown('<div class="chart-title">🏢 Gastos por Locación</div>', unsafe_allow_html=True)
         g_loc = gasto_df.groupby('LOCACION')['SALDO'].apply(lambda x: abs(x.sum())).reset_index()
         fig_loc = px.pie(
             g_loc, values='SALDO', names='LOCACION', hole=0.4,
             color_discrete_sequence=['#E61C24', '#1E1E1E', '#7F1D1D', '#9CA3AF', '#D1D5DB']
         )
         fig_loc.update_traces(textposition='inside', textinfo='percent+label')
-        fig_loc.update_layout(height=300, margin=dict(l=10, r=10, t=10, b=10))
+        fig_loc.update_layout(height=280, margin=dict(l=10, r=10, t=10, b=10))
         st.plotly_chart(fig_loc, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     with c_r2_2:
         st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">⚠️ Cuentas con Mayor Desviación</div>', unsafe_allow_html=True)
+        st.markdown('<div class="chart-title">⚠️ Cuentas con Mayor Desviación</div>', unsafe_allow_html=True)
         p_cta = presupuesto_df.groupby('DESC CTA CBLE')['SALDO'].sum().rename('Presupuesto')
         g_cta = gasto_df.groupby('DESC CTA CBLE')['SALDO'].apply(lambda x: abs(x.sum())).rename('Gasto Real')
         comp_cta = pd.concat([p_cta, g_cta], axis=1).fillna(0)
@@ -345,86 +395,80 @@ if df is not None:
             top_desv, x='Desviacion', y='DESC CTA CBLE', orientation='h',
             color='Desviacion', color_continuous_scale=['#1E1E1E', '#E61C24']
         )
-        fig_desv.update_layout(template='plotly_white', height=300, margin=dict(l=10, r=10, t=10, b=10), xaxis_title="Desviación en $", yaxis_title="")
+        fig_desv.update_layout(template='plotly_white', height=280, margin=dict(l=10, r=10, t=10, b=10), xaxis_title="Desviación en $", yaxis_title="")
         st.plotly_chart(fig_desv, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     # ---------------------------------------------------------
-    # 4. TABLA TRANSACCIONAL AUDITABLE CON FILTRO DE CUENTA Y INVERSIÓN DE SIGNO
+    # 4. TABLA TRANSACCIONAL DE GASTOS (SIGNOS INVERTIDOS + FORMATO $ 10.000,85)
     # ---------------------------------------------------------
     st.markdown("---")
-    st.markdown('<div class="section-title">🔍 Consulta y Auditoría Transaccional de Gastos</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">🔍 Consulta y Auditoría Transaccional de Gastos</div>', unsafe_allow_html=True)
 
-    df_gasto_auditoria = gasto_df.copy()
+    df_auditoria = gasto_df.copy()
 
-    # FILTRO ESPECÍFICO POR CUENTA CONTABLE
-    cuentas_unicas = sorted(df_gasto_auditoria['DESC CTA CBLE'].dropna().unique())
+    # MULTISELECT CUENTAS
+    cuentas_unicas = sorted(df_auditoria['DESC CTA CBLE'].dropna().unique())
     col_f1, col_f2 = st.columns([2, 1])
     
     with col_f1:
         f_cuentas_tabla = st.multiselect("🔎 Filtrar por Cuenta Contable:", cuentas_unicas, default=[])
     with col_f2:
-        search_kw = st.text_input("💬 Buscar por Proveedor / Interno:", "")
+        search_kw = st.text_input("💬 Buscar por Proveedor / N° Interno:", "")
 
-    # Aplicar filtro de cuenta si hay seleccionadas
     if f_cuentas_tabla:
-        df_gasto_auditoria = df_gasto_auditoria[df_gasto_auditoria['DESC CTA CBLE'].isin(f_cuentas_tabla)]
+        df_auditoria = df_auditoria[df_auditoria['DESC CTA CBLE'].isin(f_cuentas_tabla)]
 
-    # Aplicar búsqueda por palabra clave
     if search_kw:
         sk = search_kw.lower()
         mask = (
-            df_gasto_auditoria['DES1'].astype(str).str.lower().str.contains(sk) |
-            df_gasto_auditoria['INTERNO'].astype(str).str.lower().str.contains(sk) |
-            df_gasto_auditoria['TEXTO INTERNO'].astype(str).str.lower().str.contains(sk)
+            df_auditoria['DES1'].astype(str).str.lower().str.contains(sk) |
+            df_auditoria['INTERNO'].astype(str).str.lower().str.contains(sk) |
+            df_auditoria['TEXTO INTERNO'].astype(str).str.lower().str.contains(sk)
         )
-        df_gasto_auditoria = df_gasto_auditoria[mask]
+        df_auditoria = df_auditoria[mask]
 
-    # REGLA DE SIGNOS SOLICITADA:
-    # Si SALDO < 0 (es un gasto ordinario) -> se invierte a Positivo (SALDO * -1)
-    # Si SALDO > 0 (es un recupero/crédito) -> se muestra en Negativo
-    df_gasto_auditoria['MONTO_AJUSTADO'] = df_gasto_auditoria['SALDO'] * -1
+    # INVERSIÓN ESTRICTA DE SIGNO PARA GASTOS:
+    # SALDO (ej: -10000.85) -> * -1 -> 10000.85 (Positivo para gasto normal)
+    df_auditoria['MONTO_MOSTRAR'] = df_auditoria['SALDO'] * -1
 
-    # Formatear columnas
-    df_gasto_auditoria['REGISTRO_ID'] = df_gasto_auditoria.index
+    # Formatear la columna de texto con el estándar $ 10.000,85
+    df_auditoria['MONTO_FORMATO'] = df_auditoria['MONTO_MOSTRAR'].apply(lambda v: formato_moneda(v, con_decimales=True))
+
     cols_tabla = [
         'FECHA', 'MES_NOMBRE', 'LOCACION', 'RESPONSABLE', 
-        'GRUPO DE CUENTAS', 'DESC CTA CBLE', 'DES1', 'INTERNO', 'MONTO_AJUSTADO', 'TEXTO INTERNO'
+        'GRUPO DE CUENTAS', 'DESC CTA CBLE', 'DES1', 'INTERNO', 'MONTO_FORMATO', 'TEXTO INTERNO'
     ]
 
-    df_render = df_gasto_auditoria[cols_tabla].rename(columns={
+    df_render = df_auditoria[cols_tabla].rename(columns={
         'MES_NOMBRE': 'MES',
         'DESC CTA CBLE': 'CUENTA CONTABLE',
         'DES1': 'PROVEEDOR / ENTIDAD',
         'INTERNO': 'N° INTERNO',
-        'MONTO_AJUSTADO': 'MONTO ($)'
+        'MONTO_FORMATO': 'MONTO ($)'
     })
 
-    # Mostrar la Tabla
     st.dataframe(
-        df_render.style.format({
-            'MONTO ($)': '$ {:,.2f}'
-        }),
+        df_render,
         use_container_width=True,
         height=380
     )
 
     # ---------------------------------------------------------
-    # INSPECTOR DINÁMICO DE TEXTO INTERNO (POP-UP / EXPANDABLE)
+    # INSPECTOR DE TEXTO INTERNO (POP-UP DETALLE)
     # ---------------------------------------------------------
     st.markdown("##### 📌 Inspeccionar 'Texto Interno' de un Gasto Especifico")
     
-    # Crear una lista amigable para seleccionar y ver el detalle
-    if not df_gasto_auditoria.empty:
-        opciones_inspeccion = df_gasto_auditoria.apply(
-            lambda r: f"ID {r.name} | {r['FECHA']} | {r['DES1']} | ${r['MONTO_AJUSTADO']:,.0f} | {r['DESC CTA CBLE']}", axis=1
+    if not df_auditoria.empty:
+        opciones_inspeccion = df_auditoria.apply(
+            lambda r: f"ID {r.name} | {r['FECHA']} | {r['DES1']} | {formato_moneda(r['MONTO_MOSTRAR'], con_decimales=True)} | {r['DESC CTA CBLE']}", axis=1
         ).tolist()
         
         selected_option = st.selectbox("Seleccione una transacción para desplegar su detalle completo:", opciones_inspeccion)
         
         if selected_option:
             selected_id = int(selected_option.split(" | ")[0].replace("ID ", ""))
-            item_row = df_gasto_auditoria.loc[selected_id]
+            item_row = df_auditoria.loc[selected_id]
             
             st.markdown(f"""
                 <div class="detail-popup">
