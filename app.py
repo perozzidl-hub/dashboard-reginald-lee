@@ -14,48 +14,62 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# ESTILOS CSS FORZADOS (Suavizado, Alto Contraste y Corrección de Fuentes)
+# ESTILOS CSS CORREGIDOS (Nitidez, Fix de Fuentes y Botones)
 # ---------------------------------------------------------
 st.markdown("""
     <style>
-    /* 1. SUAVIZADO DE TIPOGRAFÍA Y FUENTES GLOBALES */
-    * {
+    /* 1. TIPOGRAFÍA Y NITIDEZ GLOBAL */
+    html, body, [class*="css"], .stApp {
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
         -webkit-font-smoothing: antialiased !important;
         -moz-osx-font-smoothing: grayscale !important;
         text-rendering: optimizeLegibility !important;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
     }
 
-    /* Fondo General de la App */
     .stApp {
         background-color: #0E1117 !important;
     }
 
+    /* Ocultar textos sr-only para evitar glitches como 'visibili...' o 'uploadpload' */
+    .sr-only, 
+    [data-testid="stSidebar"] .sr-only, 
+    div[data-baseweb="input"] span[class*="sr-only"],
+    span[class*="sr-only"] {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+    }
+
     /* ------------------------------------
-       TARJETA DE LOGIN SIMÉTRICA Y CAMPOS
+       TARJETA DE LOGIN Y CAMPOS
     ------------------------------------ */
     div[data-testid="stForm"] {
         background-color: #1A1D24 !important;
         border-radius: 16px !important;
         padding: 35px 30px !important;
         box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4) !important;
-        border-top: 6px solid #E61C24 !important;
+        border-top: 5px solid #E61C24 !important;
         border-left: 1px solid #2D3139 !important;
         border-right: 1px solid #2D3139 !important;
         border-bottom: 1px solid #2D3139 !important;
-        max-width: 420px;
+        max-width: 400px;
         margin: 0 auto;
     }
 
-    /* Títulos dentro del Login */
     .login-title {
         color: #FFFFFF !important;
         font-weight: 800 !important;
         font-size: 22px !important;
         text-align: center;
-        margin-top: 15px !important;
+        margin-top: 10px !important;
         margin-bottom: 2px !important;
-        letter-spacing: -0.5px;
+        letter-spacing: -0.3px;
     }
 
     .login-subtitle {
@@ -66,7 +80,7 @@ st.markdown("""
         margin-bottom: 25px !important;
     }
 
-    /* CORRECCIÓN DE TEXTO AL TIPIEAR (USUARIO Y CONTRASEÑA) */
+    /* ENTRADAS DE TEXTO (USUARIO Y CONTRASEÑA) */
     div[data-testid="stForm"] label p {
         color: #E5E7EB !important;
         font-weight: 600 !important;
@@ -80,7 +94,7 @@ st.markdown("""
     }
 
     div[data-testid="stForm"] input {
-        color: #FFFFFF !important; /* Texto blanco brillante al escribir */
+        color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
         font-weight: 600 !important;
         font-size: 14px !important;
@@ -92,12 +106,7 @@ st.markdown("""
         -webkit-text-fill-color: #6B7280 !important;
     }
 
-    /* Botón Ojo de la Contraseña */
-    div[data-testid="stForm"] button[aria-label="Show password"] {
-        color: #9CA3AF !important;
-    }
-
-    /* Botón Submit Rojo */
+    /* Botón Submit Rojo del Login */
     div[data-testid="stForm"] button[kind="secondaryFormSubmit"] {
         background-color: #E61C24 !important;
         color: #FFFFFF !important;
@@ -117,9 +126,45 @@ st.markdown("""
     }
 
     /* ------------------------------------
-       ESTILOS DE MENÚS DESPLEGABLES (MULTISELECTS Y DESPLEGABLES)
+       SIDEBAR Y FILE UPLOADER (IMAGEN 3 FIX)
     ------------------------------------ */
-    /* Popover de Opciones */
+    section[data-testid="stSidebar"] {
+        background-color: #111827 !important;
+    }
+
+    /* Corrección del File Uploader para evitar 'uploadpload' */
+    [data-testid="stFileUploader"] section {
+        background-color: #1A1D24 !important;
+        border: 1px dashed #374151 !important;
+        border-radius: 8px !important;
+        padding: 10px !important;
+    }
+
+    [data-testid="stFileUploader"] section button {
+        background-color: #262A33 !important;
+        color: #FFFFFF !important;
+        border: 1px solid #374151 !important;
+        border-radius: 6px !important;
+    }
+
+    /* Botones generales del Sidebar (ej: Cerrar Sesión) */
+    section[data-testid="stSidebar"] button {
+        border-radius: 8px !important;
+        border: 1px solid #374151 !important;
+        background-color: #1F2937 !important;
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+    }
+
+    section[data-testid="stSidebar"] button:hover {
+        background-color: #E61C24 !important;
+        color: #FFFFFF !important;
+        border-color: #E61C24 !important;
+    }
+
+    /* ------------------------------------
+       MENÚS DESPLEGABLES (MULTISELECTS)
+    ------------------------------------ */
     div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"] {
         background-color: #1F2937 !important;
         border: 1px solid #374151 !important;
@@ -127,7 +172,6 @@ st.markdown("""
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
     }
 
-    /* Items dentro de las listas */
     li[role="option"], div[role="option"] {
         color: #F3F4F6 !important;
         font-size: 13px !important;
@@ -140,7 +184,6 @@ st.markdown("""
         color: #FFFFFF !important;
     }
 
-    /* Etiquetas seleccionadas en Multiselect */
     span[data-baseweb="tag"] {
         background-color: #E61C24 !important;
         border-radius: 4px !important;
@@ -154,28 +197,6 @@ st.markdown("""
     /* ------------------------------------
        ESTILOS DEL DASHBOARD PRINCIPAL
     ------------------------------------ */
-    section[data-testid="stSidebar"] {
-        background-color: #111827 !important;
-    }
-    
-    section[data-testid="stSidebar"] h1, 
-    section[data-testid="stSidebar"] h2, 
-    section[data-testid="stSidebar"] h3, 
-    section[data-testid="stSidebar"] h4, 
-    section[data-testid="stSidebar"] label,
-    section[data-testid="stSidebar"] p,
-    section[data-testid="stSidebar"] span {
-        color: #FFFFFF !important;
-        font-weight: 600 !important;
-    }
-
-    .main h1, .main h2, .main h3, .main h4, .main h5,
-    div[data-testid="stMarkdownContainer"] h3,
-    div[data-testid="stMarkdownContainer"] h4 {
-        color: #FFFFFF !important;
-        font-weight: 700 !important;
-    }
-
     .main-header {
         background: linear-gradient(135deg, #111827 0%, #E61C24 100%);
         padding: 20px 25px;
@@ -318,22 +339,15 @@ if 'df_data' not in st.session_state:
 # ---------------------------------------------------------
 if not st.session_state['logged_in']:
     st.markdown("<br><br>", unsafe_allow_html=True)
-    col_l1, col_l2, col_l3 = st.columns([1, 1.2, 1])
+    col_l1, col_l2, col_l3 = st.columns([1, 1.1, 1])
     
     with col_l2:
         with st.form("login_form"):
-            # BOTELAL ROJA COCA-COLA (SVG VECTORIAL DIRECTO 100% GARANTIZADO)
+            # BOTELLA ROJA COCA-COLA - SILUETA FIEL A LA IMAGEN 1
             st.markdown("""
-                <div style="text-align: center; margin-bottom: 10px;">
-                    <svg width="42" height="90" viewBox="0 0 100 280" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <!-- Tapa -->
-                        <rect x="38" y="5" width="24" height="12" rx="3" fill="#E61C24" />
-                        <!-- Cuello -->
-                        <path d="M42 17 H58 V45 C58 55 68 65 72 75 C78 90 78 110 74 130 C70 145 68 160 70 180 C73 200 75 220 72 240 C70 255 62 265 50 265 C38 265 30 255 28 240 C25 220 27 200 30 180 C32 160 30 145 26 130 C22 110 22 90 28 75 C32 65 42 55 42 45 Z" fill="#E61C24" />
-                        <!-- Franja Central / Etiqueta -->
-                        <path d="M25 125 C35 120 65 120 75 125 C76 140 75 155 72 170 C62 175 38 175 28 170 C25 155 24 140 25 125 Z" fill="#FFFFFF" opacity="0.9" />
-                        <!-- Detalle Trazos -->
-                        <path d="M32 140 C42 137 58 137 68 140 C65 152 58 158 50 158 C42 158 35 152 32 140 Z" fill="#E61C24" />
+                <div style="text-align: center; margin-bottom: 15px;">
+                    <svg width="40" height="120" viewBox="0 0 100 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M42 6 C42 2 58 2 58 6 L60 18 C60 21 57 23 57 25 C57 30 63 42 66 55 C69 68 72 82 70 98 C68 112 58 125 58 135 C58 145 68 158 70 175 C73 195 71 215 67 235 C64 252 61 268 58 280 C56 288 53 292 50 292 C47 292 44 288 42 280 C39 268 36 252 33 235 C29 215 27 195 30 175 C32 158 42 145 42 135 C42 125 32 112 30 98 C28 82 31 68 34 55 C37 42 43 30 43 25 C43 23 40 21 40 18 Z" fill="#E61C24"/>
                     </svg>
                 </div>
             """, unsafe_allow_html=True)
