@@ -6,7 +6,7 @@ import plotly.express as px
 # CONFIGURACIÓN DE PÁGINA
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="Dashboard Control de Gastos & Operaciones",
+    page_title="Dashboard Control de Gastos",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -106,13 +106,9 @@ def obtener_columna(df, posibles_nombres):
 def cargar_datos_multihoja(file):
     xls = pd.ExcelFile(file)
     hojas = xls.sheet_names
-    hojas_clean = [h.strip().upper() for h in hojas]
 
     # 1. Hoja Principal (Presupuesto y Gastos)
-    idx_main = 0
-    df_main = pd.read_excel(xls, sheet_name=hojas[idx_main])
-    df_main.columns = [str(c).strip() for c in df_main.columns]
-    
+    df_main = pd.read_excel(xls, sheet_name=0)
     if 'MES' in df_main.columns:
         df_main['MES_DT'] = pd.to_datetime(df_main['MES'], errors='coerce')
         df_main['MES_NOMBRE'] = df_main['MES_DT'].dt.strftime('%Y-%m')
@@ -122,35 +118,25 @@ def cargar_datos_multihoja(file):
 
     # 2. Hoja Vales de Consumo
     df_vales = pd.DataFrame()
-    idx_vales = next((i for i, h in enumerate(hojas_clean) if 'VALE' in h or 'CONSUMO' in h), None)
-    if idx_vales is None and len(hojas) > 1:
-        idx_vales = 1
-        
-    if idx_vales is not None and idx_vales < len(hojas):
-        df_vales = pd.read_excel(xls, sheet_name=hojas[idx_vales])
-
-    if not df_vales.empty:
-        df_vales.columns = [str(c).strip() for c in df_vales.columns]
-        col_fecha_v = obtener_columna(df_vales, ['FECHA', 'MES', 'FEC CMPTE', 'FEC OP'])
-        if col_fecha_v:
-            df_vales['MES_DT'] = pd.to_datetime(df_vales[col_fecha_v], errors='coerce')
-            df_vales['MES_NOMBRE'] = df_vales['MES_DT'].dt.strftime('%Y-%m')
+    if len(hojas) > 1:
+        df_vales = pd.read_excel(xls, sheet_name=1)
+        if not df_vales.empty:
+            df_vales.columns = [str(c).strip() for c in df_vales.columns]
+            col_fecha_v = obtener_columna(df_vales, ['FECHA', 'MES', 'FEC CMPTE', 'FEC OP'])
+            if col_fecha_v:
+                df_vales['MES_DT'] = pd.to_datetime(df_vales[col_fecha_v], errors='coerce')
+                df_vales['MES_NOMBRE'] = df_vales['MES_DT'].dt.strftime('%Y-%m')
 
     # 3. Hoja Compras
     df_compras = pd.DataFrame()
-    idx_compras = next((i for i, h in enumerate(hojas_clean) if 'COMPRA' in h or 'PROVEEDOR' in h), None)
-    if idx_compras is None and len(hojas) > 2:
-        idx_compras = 2
-        
-    if idx_compras is not None and idx_compras < len(hojas):
-        df_compras = pd.read_excel(xls, sheet_name=hojas[idx_compras])
-
-    if not df_compras.empty:
-        df_compras.columns = [str(c).strip() for c in df_compras.columns]
-        col_fecha_c = obtener_columna(df_compras, ['Fec Cmpte', 'Fec OP', 'Fec Ped', 'FECHA', 'MES'])
-        if col_fecha_c:
-            df_compras['MES_DT'] = pd.to_datetime(df_compras[col_fecha_c], errors='coerce')
-            df_compras['MES_NOMBRE'] = df_compras['MES_DT'].dt.strftime('%Y-%m')
+    if len(hojas) > 2:
+        df_compras = pd.read_excel(xls, sheet_name=2)
+        if not df_compras.empty:
+            df_compras.columns = [str(c).strip() for c in df_compras.columns]
+            col_fecha_c = obtener_columna(df_compras, ['FEC CMPTE', 'FEC OP', 'FEC PED', 'FECHA', 'MES'])
+            if col_fecha_c:
+                df_compras['MES_DT'] = pd.to_datetime(df_compras[col_fecha_c], errors='coerce')
+                df_compras['MES_NOMBRE'] = df_compras['MES_DT'].dt.strftime('%Y-%m')
 
     return {'main': df_main, 'vales': df_vales, 'compras': df_compras}
 
@@ -222,7 +208,7 @@ modulo_seleccionado = st.sidebar.radio(
 st.sidebar.markdown("---")
 
 # ---------------------------------------------------------
-# MÓDULO 1: PRESUPUESTO Y GASTOS
+# MÓDULO 1: PRESUPUESTO Y GASTOS (SECCIÓN ORIGINAL)
 # ---------------------------------------------------------
 if modulo_seleccionado == "📊 Presupuesto y Gastos":
     st.markdown(f"""
@@ -303,7 +289,7 @@ if modulo_seleccionado == "📊 Presupuesto y Gastos":
                 autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
                 xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
                 yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
-                height=320, margin=dict(l=15, r=15, t=15, b=15), xasis_title="", yaxis_title=""
+                height=320, margin=dict(l=15, r=15, t=15, b=15), xaxis_title="", yaxis_title=""
             )
             st.plotly_chart(fig_rubro, use_container_width=True, config=PLOTLY_CONFIG)
 
@@ -332,58 +318,9 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
     df_vales = data_dict['vales'] if data_dict else pd.DataFrame()
 
     if df_vales.empty:
-        st.info("ℹ️ No se encontraron datos en la pestaña de 'Vales de Consumo'. Asegúrese de agregar la hoja al Excel.")
+        st.info("ℹ️ No se encontraron datos en la pestaña de Vales de Consumo.")
     else:
-        col_resp_v = obtener_columna(df_vales, ['RESPONSABLE', 'USUARIO', 'SECTOR', 'SOLICITANTE'])
-        col_monto_v = obtener_columna(df_vales, ['MONTO', 'TOTAL', 'IMPORTE', 'NETO_TOTAL_FACTURA', 'VALOR', 'PRECIO TOTAL'])
-        col_cant_v = obtener_columna(df_vales, ['CANTIDAD', 'CANT', 'UNIDADES', 'VALES'])
-        col_mes_v = 'MES_NOMBRE' if 'MES_NOMBRE' in df_vales.columns else obtener_columna(df_vales, ['FECHA', 'MES', 'FEC CMPTE'])
-
-        # Filtrar por usuario
-        if col_resp_v and not st.session_state['is_admin']:
-            df_v_user = df_vales[df_vales[col_resp_v].astype(str).str.upper() == st.session_state['user']]
-        else:
-            df_v_user = df_vales.copy()
-
-        # Filtros Sidebar
-        st.sidebar.subheader("🎯 Filtros Vales")
-        
-        if col_mes_v and col_mes_v in df_v_user.columns:
-            meses_v = sorted(df_v_user[col_mes_v].dropna().unique())
-            f_mes_v = st.sidebar.multiselect("Filtrar Mes:", meses_v, default=meses_v)
-            if f_mes_v:
-                df_v_user = df_v_user[df_v_user[col_mes_v].isin(f_mes_v)]
-
-        if col_resp_v and st.session_state['is_admin']:
-            resps_v = sorted(df_v_user[col_resp_v].dropna().unique())
-            if resps_v:
-                f_resp_v = st.sidebar.multiselect("Filtrar Sector/Responsable:", resps_v, default=resps_v)
-                if f_resp_v:
-                    df_v_user = df_v_user[df_v_user[col_resp_v].isin(f_resp_v)]
-
-        # Métricas
-        vales_emitidos = len(df_v_user)
-        monto_total_v = pd.to_numeric(df_v_user[col_monto_v], errors='coerce').sum() if col_monto_v else 0
-        total_unidades = pd.to_numeric(df_v_user[col_cant_v], errors='coerce').sum() if col_cant_v else vales_emitidos
-
-        kv1, kv2, kv3 = st.columns(3)
-        with kv1:
-            st.markdown(f'<div class="custom-card"><div class="card-title">Monto Total Vales</div><div class="card-value">{formato_moneda(monto_total_v)}</div></div>', unsafe_allow_html=True)
-        with kv2:
-            st.markdown(f'<div class="custom-card"><div class="card-title">Cantidad de Registros</div><div class="card-value">{vales_emitidos:,}</div></div>', unsafe_allow_html=True)
-        with kv3:
-            st.markdown(f'<div class="custom-card"><div class="card-title">Total Unidades/Artículos</div><div class="card-value">{total_unidades:,.0f}</div></div>', unsafe_allow_html=True)
-
-        # Tabla de Vales
-        st.markdown("---")
-        st.markdown("### 📋 Listado de Vales de Consumo")
-        search_v = st.text_input("🔎 Buscar en Vales:", "")
-        df_v_render = df_v_user.copy()
-        if search_v:
-            mask_v = df_v_render.astype(str).apply(lambda x: x.str.lower().str.contains(search_v.lower())).any(axis=1)
-            df_v_render = df_v_render[mask_v]
-
-        st.dataframe(df_v_render, use_container_width=True, height=380)
+        st.dataframe(df_vales, use_container_width=True, height=450)
 
 # ---------------------------------------------------------
 # MÓDULO 3: COMPRAS
@@ -399,36 +336,22 @@ elif modulo_seleccionado == "🛒 Compras":
     df_compras = data_dict['compras'] if data_dict else pd.DataFrame()
 
     if df_compras.empty:
-        st.info("ℹ️ No se encontraron datos en la pestaña de 'Compras'. Asegúrese de agregar la hoja al Excel.")
+        st.info("ℹ️ No se encontraron datos en la pestaña de Compras.")
     else:
-        col_resp_c = obtener_columna(df_compras, ['RESPONSABLE', 'USUARIO', 'SOLICITANTE', 'COMPRADOR'])
-        col_monto_c = obtener_columna(df_compras, ['NETO_TOTAL_FACTURA', 'NETO_UNI_FACTURA', 'MONTO', 'IMPORTE', 'TOTAL', 'SALDO'])
-        col_prov_c = obtener_columna(df_compras, ['RAZ_SOCIAL', 'PROVEEDOR', 'RAZON SOCIAL', 'DES1', 'ENTIDAD'])
-        col_mes_c = 'MES_NOMBRE' if 'MES_NOMBRE' in df_compras.columns else obtener_columna(df_compras, ['Fec Cmpte', 'Fec OP', 'FECHA', 'MES'])
-
-        # Filtrar por Responsable si la columna existe
-        if col_resp_c and not st.session_state['is_admin']:
-            df_c_user = df_compras[df_compras[col_resp_c].astype(str).str.upper() == st.session_state['user']]
-        else:
-            df_c_user = df_compras.copy()
+        col_monto_c = obtener_columna(df_compras, ['NETO_TOTAL_FACTURA', 'MONTO', 'TOTAL', 'IMPORTE'])
+        col_prov_c = obtener_columna(df_compras, ['RAZ_SOCIAL', 'PROVEEDOR', 'RAZON SOCIAL'])
+        col_mes_c = 'MES_NOMBRE' if 'MES_NOMBRE' in df_compras.columns else obtener_columna(df_compras, ['FEC CMPTE', 'FEC OP', 'FECHA', 'MES'])
 
         # Filtros Sidebar
         st.sidebar.subheader("🎯 Filtros de Compras")
+
+        df_c_user = df_compras.copy()
 
         if col_mes_c and col_mes_c in df_c_user.columns:
             meses_c = sorted(df_c_user[col_mes_c].dropna().unique())
             f_mes_c = st.sidebar.multiselect("Filtrar Mes:", meses_c, default=meses_c)
             if f_mes_c:
                 df_c_user = df_c_user[df_c_user[col_mes_c].isin(f_mes_c)]
-
-        if col_resp_c and st.session_state['is_admin']:
-            resps_c = sorted(df_c_user[col_resp_c].dropna().unique())
-            if resps_c:
-                f_resp_c = st.sidebar.multiselect("Filtrar Responsable:", resps_c, default=resps_c)
-                if f_resp_c:
-                    df_c_user = df_c_user[df_c_user[col_resp_c].isin(f_resp_c)]
-        elif not col_resp_c:
-            st.sidebar.caption("ℹ️ Hoja Compras: Vista general (sin columna Responsable).")
 
         # Métricas
         compras_totales = len(df_c_user)
@@ -443,36 +366,6 @@ elif modulo_seleccionado == "🛒 Compras":
         with kc3:
             st.markdown(f'<div class="custom-card"><div class="card-title">Mayor Compra Registrada</div><div class="card-value">{formato_moneda(compra_maxima, con_decimales=True)}</div></div>', unsafe_allow_html=True)
 
-        # Gráficos
-        col_cg1, col_cg2 = st.columns([1.3, 1])
-        with col_cg1:
-            st.markdown('<div class="chart-box-title">📅 Evolución de Compras Mensuales</div>', unsafe_allow_html=True)
-            if col_mes_c and col_monto_c and col_mes_c in df_c_user.columns:
-                df_c_user[col_monto_c] = pd.to_numeric(df_c_user[col_monto_c], errors='coerce').fillna(0)
-                g_mes_c = df_c_user.groupby(col_mes_c)[col_monto_c].sum().reset_index()
-                fig_mc = px.bar(g_mes_c, x=col_mes_c, y=col_monto_c, color_discrete_sequence=['#E61C24'])
-                fig_mc.update_layout(
-                    autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
-                    xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
-                    yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
-                    height=300, margin=dict(l=15, r=15, t=15, b=25), xaxis_title="", yaxis_title=""
-                )
-                st.plotly_chart(fig_mc, use_container_width=True, config=PLOTLY_CONFIG)
-
-        with col_cg2:
-            st.markdown('<div class="chart-box-title">🏢 Top Proveedores</div>', unsafe_allow_html=True)
-            if col_prov_c and col_monto_c:
-                g_prov_c = df_c_user.groupby(col_prov_c)[col_monto_c].sum().reset_index().sort_values(by=col_monto_c, ascending=True).tail(5)
-                fig_pc = px.bar(g_prov_c, x=col_monto_c, y=col_prov_c, orientation='h', color_discrete_sequence=['#9CA3AF'])
-                fig_pc.update_layout(
-                    autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
-                    xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
-                    yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
-                    height=300, margin=dict(l=15, r=15, t=15, b=15), xaxis_title="", yaxis_title=""
-                )
-                st.plotly_chart(fig_pc, use_container_width=True, config=PLOTLY_CONFIG)
-
-        # Tabla de Compras
         st.markdown("---")
         st.markdown("### 🛍️ Listado General de Compras")
 
@@ -483,4 +376,4 @@ elif modulo_seleccionado == "🛒 Compras":
             mask_c = df_c_render.astype(str).apply(lambda x: x.str.lower().str.contains(search_c.lower())).any(axis=1)
             df_c_render = df_c_render[mask_c]
 
-        st.dataframe(df_c_render, use_container_width=True, height=380)
+        st.dataframe(df_c_render, use_container_width=True, height=400)
