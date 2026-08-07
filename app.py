@@ -699,42 +699,42 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
     if df_vales.empty:
         st.info("ℹ️ No se encontraron datos en la pestaña de 'Vales de Consumo'. Asegúrese de agregar la hoja al Excel.")
     else:
-        col_monto_v = obtener_columna(df_vales, ['MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'VALOR', 'PRECIO TOTAL', 'NETO_TOTAL_FACTURA'])
-        col_cuenta_v = obtener_columna(df_vales, ['DESC CTA CBLE', 'CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'CONCEPTO', 'CATEGORIA', 'GRUPO DE CUENTAS'])
+        # Mapeo de columnas flexible
+        col_monto_v = obtener_columna(df_vales, ['MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'VALOR', 'PRECIO TOTAL', 'NETO_TOTAL_FACTURA', 'CANTIDAD'])
+        col_cuenta_v = obtener_columna(df_vales, ['DESC CTA CBLE', 'CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'CONCEPTO', 'CATEGORIA', 'RUBRO', 'CATEGORÍA'])
         col_mes_v = 'MES_NOMBRE' if 'MES_NOMBRE' in df_vales.columns else obtener_columna(df_vales, ['MES', 'FECHA'])
-        col_resp_directo = obtener_columna(df_vales, ['RESPONSABLE', 'USUARIO', 'SOLICITANTE'])
+        col_resp_directo = obtener_columna(df_vales, ['RESPONSABLE', 'USUARIO', 'SOLICITANTE', 'RETIRA', 'NOMBRE RETIRA'])
 
-        # Filtrado de cuentas asociadas según perfil de usuario
+        # Filtrado inteligente según Perfil
         if not st.session_state['is_admin']:
-            resps_activos = [st.session_state['user']]
-            cuentas_permitidas = obtener_cuentas_de_responsables(df_main, resps_activos)
+            u_user = st.session_state['user'].upper()
             
+            # 1. Intentar filtrar por columna Responsable directa en Vales
+            mask_v = pd.Series(False, index=df_vales.index)
             if col_resp_directo and col_resp_directo in df_vales.columns:
-                mask_user = (df_vales[col_resp_directo].astype(str).str.upper() == st.session_state['user'])
-                if col_cuenta_v:
-                    mask_user = mask_user | (df_vales[col_cuenta_v].astype(str).str.strip().isin(cuentas_permitidas))
-                df_v_user = df_vales[mask_user].copy()
-            elif col_cuenta_v:
-                df_v_user = df_vales[df_vales[col_cuenta_v].astype(str).str.strip().isin(cuentas_permitidas)].copy()
+                mask_v = mask_v | (df_vales[col_resp_directo].astype(str).str.upper().str.contains(u_user))
+
+            # 2. Obtener cuentas asociadas desde la hoja Main (tanto descripción como código)
+            cuentas_permitidas = obtener_cuentas_de_responsables(df_main, [u_user])
+            
+            if col_cuenta_v and col_cuenta_v in df_vales.columns and cuentas_permitidas:
+                # Coincidencia flexible de cuentas
+                mask_cta = df_vales[col_cuenta_v].astype(str).str.strip().str.upper().isin([c.upper() for c in cuentas_permitidas])
+                mask_v = mask_v | mask_cta
+
+            # Si se hallaron coincidencias aplicar filtro; si no, mostrar todos los datos donde participe como Responsable
+            if mask_v.any():
+                df_v_user = df_vales[mask_v].copy()
             else:
-                df_v_user = df_vales.copy()
+                df_v_user = df_vales.copy() # Resguardo si no encuentra coincidencia estricta
         else:
-            # Vista Administrador
             st.sidebar.subheader("🎯 Filtros Administrador")
             resps_disp = sorted(df_main['RESPONSABLE'].dropna().unique()) if not df_main.empty else []
             f_resp_v = st.sidebar.multiselect("Filtrar por Responsables:", resps_disp, default=resps_disp)
             
-            if f_resp_v:
-                cuentas_permitidas = obtener_cuentas_de_responsables(df_main, f_resp_v)
-                if col_resp_directo and col_resp_directo in df_vales.columns:
-                    mask_a = df_vales[col_resp_directo].astype(str).str.upper().isin([r.upper() for r in f_resp_v])
-                    if col_cuenta_v:
-                        mask_a = mask_a | df_vales[col_cuenta_v].astype(str).str.strip().isin(cuentas_permitidas)
-                    df_v_user = df_vales[mask_a].copy()
-                elif col_cuenta_v:
-                    df_v_user = df_vales[df_vales[col_cuenta_v].astype(str).str.strip().isin(cuentas_permitidas)].copy()
-                else:
-                    df_v_user = df_vales.copy()
+            if f_resp_v and col_resp_directo and col_resp_directo in df_vales.columns:
+                resps_upper = [r.upper() for r in f_resp_v]
+                df_v_user = df_vales[df_vales[col_resp_directo].astype(str).str.upper().isin(resps_upper)].copy()
             else:
                 df_v_user = df_vales.copy()
 
@@ -747,10 +747,9 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
             if f_mes_v:
                 df_v_user = df_v_user[df_v_user[col_mes_v].isin(f_mes_v)]
 
-        # Filtro de Búsqueda de Cuenta Contable por Nombre
         if col_cuenta_v and col_cuenta_v in df_v_user.columns:
             cuentas_v_disp = sorted(df_v_user[col_cuenta_v].dropna().astype(str).unique())
-            f_cta_v = st.sidebar.multiselect("🔎 Filtrar Nombre de Cuenta Contable:", cuentas_v_disp, default=[])
+            f_cta_v = st.sidebar.multiselect("🔎 Filtrar Nombre de Cuenta / Categoría:", cuentas_v_disp, default=[])
             if f_cta_v:
                 df_v_user = df_v_user[df_v_user[col_cuenta_v].astype(str).isin(f_cta_v)]
 
@@ -808,7 +807,6 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
             df_v_render = df_v_render[mask_v]
 
         st.dataframe(df_v_render, use_container_width=True, height=380)
-
 # ---------------------------------------------------------
 # MÓDULO 3: COMPRAS
 # ---------------------------------------------------------
