@@ -988,7 +988,7 @@ elif modulo_seleccionado == "🛒 Compras":
             if f_cta_nom_c:
                 df_c_user = df_c_user[df_c_user[col_nombre_mostrar].astype(str).str.strip().isin(f_cta_nom_c)]
 
-        # ---------------------------------------------------------
+       # ---------------------------------------------------------
         # 4. MÉTRICAS Y GRÁFICOS OPTIMIZADOS
         # ---------------------------------------------------------
         compras_totales = len(df_c_user)
@@ -1005,22 +1005,16 @@ elif modulo_seleccionado == "🛒 Compras":
 
         col_cg1, col_cg2 = st.columns([1.2, 1.1])
         
-      with col_cg1:
+        with col_cg1:
             st.markdown('<div class="chart-box-title">🏢 Top 5 Proveedores más Solicitados</div>', unsafe_allow_html=True)
-            
-            # Prioridad absoluta a RAZ_SOCIAL y variaciones de Razón Social sobre Proveedor
             col_c_prov = obtener_columna(df_c_user, ['RAZ_SOCIAL', 'RAZON SOCIAL', 'RAZÓN SOCIAL', 'NOMBRE PROVEEDOR', 'NOMBRE_PROVEEDOR'])
             
             if col_c_prov and col_c_monto and col_c_prov in df_c_user.columns:
                 df_c_user[col_c_monto] = pd.to_numeric(df_c_user[col_c_monto], errors='coerce').fillna(0)
                 
-                # Forzar conversión a texto limpio para evitar interpretación numéricas o códigos
                 df_c_user['PROVEEDOR_LABEL'] = df_c_user[col_c_prov].astype(str).str.strip()
-                
-                # Filtrar valores nulos o vacíos
                 df_c_clean = df_c_user[~df_c_user['PROVEEDOR_LABEL'].isin(['nan', 'None', '', '0', '-', 'NAN'])].copy()
 
-                # Agrupar por Razón Social y obtener el Top 5 por monto
                 g_prov_c = df_c_clean.groupby('PROVEEDOR_LABEL')[col_c_monto].apply(lambda x: abs(x.sum())).reset_index()
                 g_prov_c = g_prov_c.sort_values(by=col_c_monto, ascending=True).tail(5)
 
@@ -1033,7 +1027,7 @@ elif modulo_seleccionado == "🛒 Compras":
                 )
                 
                 fig_prov_c.update_xaxes(title="", tickformat="$,.0f")
-                fig_prov_c.update_yaxes(type='category', title="") # Forzar etiquetas categóricas puras
+                fig_prov_c.update_yaxes(type='category', title="")
                 fig_prov_c.update_traces(hovertemplate='<b>Proveedor:</b> %{y}<br><b>Monto Comprado:</b> $%{x:,.0f}')
                 
                 fig_prov_c.update_layout(
@@ -1090,7 +1084,6 @@ elif modulo_seleccionado == "🛒 Compras":
                     )
                 )
                 st.plotly_chart(fig_cc, use_container_width=True, config=PLOTLY_CONFIG)
-
         # ---------------------------------------------------------
         # 5. TABLA GENERAL
         # ---------------------------------------------------------
