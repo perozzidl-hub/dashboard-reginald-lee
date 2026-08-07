@@ -1003,17 +1003,15 @@ elif modulo_seleccionado == "🛒 Compras":
         with kc3:
             st.markdown(f'<div class="custom-card"><div class="card-title">Promedio por Registro</div><div class="card-value">{formato_moneda(promedio_compra)}</div></div>', unsafe_allow_html=True)
 
-       col_cg1, col_cg2 = st.columns([1.2, 1.1])
+        col_cg1, col_cg2 = st.columns([1.2, 1.1])
         
         with col_cg1:
             st.markdown('<div class="chart-box-title">🏢 Top 5 Proveedores más Solicitados</div>', unsafe_allow_html=True)
-            # Priorizar nombre/razón social sobre el código numérico de proveedor
             col_c_prov = obtener_columna(df_c_user, ['NOMBRE PROVEEDOR', 'RAZON SOCIAL', 'RAZÓN SOCIAL', 'NOMBRE_PROVEEDOR', 'PROVEEDOR', 'PROVEEDORES'])
             
             if col_c_prov and col_c_monto and col_c_prov in df_c_user.columns:
                 df_c_user[col_c_monto] = pd.to_numeric(df_c_user[col_c_monto], errors='coerce').fillna(0)
                 
-                # Convertir a texto para forzar etiquetas categóricas en Plotly
                 df_c_user['PROVEEDOR_LABEL'] = df_c_user[col_c_prov].astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
                 df_c_clean = df_c_user[~df_c_user['PROVEEDOR_LABEL'].isin(['nan', 'None', '', '0', '-'])].copy()
 
@@ -1029,7 +1027,7 @@ elif modulo_seleccionado == "🛒 Compras":
                 )
                 
                 fig_prov_c.update_xaxes(title="", tickformat="$,.0f")
-                fig_prov_c.update_yaxes(type='category', title="") # Forzar eje categórico
+                fig_prov_c.update_yaxes(type='category', title="")
                 fig_prov_c.update_traces(hovertemplate='<b>Proveedor:</b> %{y}<br><b>Monto Comprado:</b> $%{x:,.0f}')
                 
                 fig_prov_c.update_layout(
@@ -1095,7 +1093,7 @@ elif modulo_seleccionado == "🛒 Compras":
 
         search_c = st.text_input("🔎 Buscar por Nombre de Cuenta, Proveedor o Detalles:", "")
         
-        cols_ocultar_c = ['KEY_CTA', 'RESPONSABLE_MAP', 'MES_CATEGORIA']
+        cols_ocultar_c = ['KEY_CTA', 'RESPONSABLE_MAP', 'PROVEEDOR_LABEL']
         df_c_render = df_c_user.drop(columns=[c for c in cols_ocultar_c if c in df_c_user.columns]).copy()
 
         if search_c:
