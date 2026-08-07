@@ -792,38 +792,35 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
         col_vg1, col_vg2 = st.columns([1.2, 1.1])
         
         with col_vg1:
-            st.markdown('<div class="chart-box-title">📅 Evolución Mensual de Consumos</div>', unsafe_allow_html=True)
-            if col_v_mes and col_v_monto and col_v_mes in df_v_user.columns:
+            st.markdown('<div class="chart-box-title">📦 Top 5 Artículos más Consumidos</div>', unsafe_allow_html=True)
+            col_v_art = obtener_columna(df_v_user, ['ARTICULO', 'ARTÍCULO', 'DESCRIPCION', 'DESCRIPCIÓN', 'DESCRIPCIÃ³N LARGA', 'DESCRIPCION LARGA', 'PRODUCTO', 'DETALLE'])
+            
+            if col_v_art and col_v_monto and col_v_art in df_v_user.columns:
                 df_v_user[col_v_monto] = pd.to_numeric(df_v_user[col_v_monto], errors='coerce').fillna(0)
                 
-                # 1. Normalizar fecha a formato estricto YYYY-MM como texto
-                df_v_user['MES_CATEGORIA'] = pd.to_datetime(df_v_user[col_v_mes], errors='coerce').dt.strftime('%Y-%m')
-                df_v_user['MES_CATEGORIA'] = df_v_user['MES_CATEGORIA'].fillna(df_v_user[col_v_mes].astype(str))
-                
-                g_mes_v = df_v_user.groupby('MES_CATEGORIA')[col_v_monto].apply(lambda x: abs(x.sum())).reset_index()
-                g_mes_v = g_mes_v.sort_values(by='MES_CATEGORIA')
+                # Agrupar por Artículo y obtener el Top 5 por monto
+                g_art_v = df_v_user.groupby(col_v_art)[col_v_monto].apply(lambda x: abs(x.sum())).reset_index()
+                g_art_v = g_art_v.sort_values(by=col_v_monto, ascending=True).tail(5)
 
-                fig_mv = px.bar(
-                    g_mes_v, 
-                    x='MES_CATEGORIA', 
-                    y=col_v_monto, 
+                fig_art_v = px.bar(
+                    g_art_v, 
+                    x=col_v_monto, 
+                    y=col_v_art, 
+                    orientation='h',
                     color_discrete_sequence=['#E61C24']
                 )
                 
-                # Forzar eje X categórico explícito (evita milisegundos)
-                fig_mv.update_xaxes(type='category', title="")
-                fig_mv.update_yaxes(title="")
-                fig_mv.update_traces(hovertemplate='<b>Mes:</b> %{x}<br><b>Total:</b> $%{y:,.0f}')
+                fig_art_v.update_xaxes(title="", tickformat="$,.0f")
+                fig_art_v.update_yaxes(title="")
+                fig_art_v.update_traces(hovertemplate='<b>Artículo:</b> %{y}<br><b>Monto Consumido:</b> $%{x:,.0f}')
                 
-                fig_mv.update_layout(
-                    autosize=True, 
-                    paper_bgcolor='#1F2937', 
-                    plot_bgcolor='#1F2937', 
-                    font=dict(color='#FFFFFF'),
-                    height=300, 
-                    margin=dict(l=15, r=15, t=15, b=25)
+                fig_art_v.update_layout(
+                    autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
+                    height=300, margin=dict(l=15, r=15, t=15, b=25)
                 )
-                st.plotly_chart(fig_mv, use_container_width=True, config=PLOTLY_CONFIG)
+                st.plotly_chart(fig_art_v, use_container_width=True, config=PLOTLY_CONFIG)
+            else:
+                st.info("ℹ️ No se detectó la columna de Artículos o Detalle en la hoja de Vales.")
 
         with col_vg2:
             st.markdown('<div class="chart-box-title">📊 Distribución por Nombre de Cuenta</div>', unsafe_allow_html=True)
@@ -1006,35 +1003,38 @@ elif modulo_seleccionado == "🛒 Compras":
         with kc3:
             st.markdown(f'<div class="custom-card"><div class="card-title">Promedio por Registro</div><div class="card-value">{formato_moneda(promedio_compra)}</div></div>', unsafe_allow_html=True)
 
-        col_cg1, col_cg2 = st.columns([1.2, 1.1])
+col_cg1, col_cg2 = st.columns([1.2, 1.1])
         
         with col_cg1:
-            st.markdown('<div class="chart-box-title">📅 Evolución Mensual de Compras</div>', unsafe_allow_html=True)
-            if col_c_mes and col_c_monto and col_c_mes in df_c_user.columns:
+            st.markdown('<div class="chart-box-title">🏢 Top 5 Proveedores más Solicitados</div>', unsafe_allow_html=True)
+            col_c_prov = obtener_columna(df_c_user, ['PROVEEDOR', 'NOMBRE PROVEEDOR', 'RAZON SOCIAL', 'RAZÓN SOCIAL', 'PROVEEDORES'])
+            
+            if col_c_prov and col_c_monto and col_c_prov in df_c_user.columns:
                 df_c_user[col_c_monto] = pd.to_numeric(df_c_user[col_c_monto], errors='coerce').fillna(0)
                 
-                df_c_user['MES_CATEGORIA'] = pd.to_datetime(df_c_user[col_c_mes], errors='coerce').dt.strftime('%Y-%m')
-                df_c_user['MES_CATEGORIA'] = df_c_user['MES_CATEGORIA'].fillna(df_c_user[col_c_mes].astype(str))
-                
-                g_mes_c = df_c_user.groupby('MES_CATEGORIA')[col_c_monto].apply(lambda x: abs(x.sum())).reset_index()
-                g_mes_c = g_mes_c.sort_values(by='MES_CATEGORIA')
+                # Agrupar por Proveedor y obtener el Top 5 por monto
+                g_prov_c = df_c_user.groupby(col_c_prov)[col_c_monto].apply(lambda x: abs(x.sum())).reset_index()
+                g_prov_c = g_prov_c.sort_values(by=col_c_monto, ascending=True).tail(5)
 
-                fig_mc = px.bar(
-                    g_mes_c, 
-                    x='MES_CATEGORIA', 
-                    y=col_c_monto, 
+                fig_prov_c = px.bar(
+                    g_prov_c, 
+                    x=col_c_monto, 
+                    y=col_c_prov, 
+                    orientation='h',
                     color_discrete_sequence=['#E61C24']
                 )
                 
-                fig_mc.update_xaxes(type='category', title="")
-                fig_mc.update_yaxes(title="")
-                fig_mc.update_traces(hovertemplate='<b>Mes:</b> %{x}<br><b>Total:</b> $%{y:,.0f}')
+                fig_prov_c.update_xaxes(title="", tickformat="$,.0f")
+                fig_prov_c.update_yaxes(title="")
+                fig_prov_c.update_traces(hovertemplate='<b>Proveedor:</b> %{y}<br><b>Monto Comprado:</b> $%{x:,.0f}')
                 
-                fig_mc.update_layout(
+                fig_prov_c.update_layout(
                     autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
                     height=300, margin=dict(l=15, r=15, t=15, b=25)
                 )
-                st.plotly_chart(fig_mc, use_container_width=True, config=PLOTLY_CONFIG)
+                st.plotly_chart(fig_prov_c, use_container_width=True, config=PLOTLY_CONFIG)
+            else:
+                st.info("ℹ️ No se detectó la columna de Proveedores en la hoja de Compras.")
 
         with col_cg2:
             st.markdown('<div class="chart-box-title">📊 Distribución por Nombre de Cuenta</div>', unsafe_allow_html=True)
