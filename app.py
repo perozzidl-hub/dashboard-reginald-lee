@@ -920,7 +920,6 @@ elif modulo_seleccionado == "🛒 Compras":
         col_m_nom_cta = obtener_columna(df_main, ['DESC CTA CBLE', 'DESCRIPCION CUENTA', 'NOMBRE CUENTA', 'CUENTA_NORMALIZADA'])
         col_m_resp = 'RESPONSABLE'
 
-        # Construir tabla de mapeo de Cuentas -> Responsable y Nombre de Cuenta desde Main
         if col_m_num_cta and col_m_nom_cta and col_m_resp in df_main.columns:
             mapa_cuentas = df_main[[col_m_num_cta, col_m_nom_cta, col_m_resp]].drop_duplicates().copy()
             mapa_cuentas[col_m_num_cta] = mapa_cuentas[col_m_num_cta].astype(str).str.strip()
@@ -928,18 +927,15 @@ elif modulo_seleccionado == "🛒 Compras":
         else:
             mapa_cuentas = pd.DataFrame()
 
-        # Mapear columnas clave en la hoja Compras
         col_c_num_cta = obtener_columna(df_compras, ['CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'NRO CUENTA', 'CODIGO'])
         col_c_monto = obtener_columna(df_compras, ['MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'VALOR', 'PRECIO TOTAL', 'NETO_TOTAL_FACTURA', 'PRECIO', 'NETO'])
         col_c_mes = 'MES_NOMBRE' if 'MES_NOMBRE' in df_compras.columns else obtener_columna(df_compras, ['MES', 'FECHA'])
 
         df_c_trabajo = df_compras.copy()
 
-        # Realizar el cruce si existe el número de cuenta
         if col_c_num_cta and not mapa_cuentas.empty:
             df_c_trabajo['KEY_CTA'] = df_c_trabajo[col_c_num_cta].astype(str).str.strip()
             
-            # Unir con el mapeo por Número de Cuenta
             df_c_trabajo = df_c_trabajo.merge(
                 mapa_cuentas.rename(columns={
                     col_m_num_cta: 'KEY_CTA',
@@ -977,18 +973,16 @@ elif modulo_seleccionado == "🛒 Compras":
                 df_c_user = df_c_trabajo.copy()
 
         # ---------------------------------------------------------
-        # 3. FILTROS LATERALES (BUSQUEDA EXCLUSIVA POR NOMBRE DE CUENTA)
+        # 3. FILTROS LATERALES
         # ---------------------------------------------------------
         st.sidebar.subheader("🎯 Filtros Compras")
         
-        # Filtro por Mes
         if col_c_mes and col_c_mes in df_c_user.columns:
             meses_c = sorted(df_c_user[col_c_mes].dropna().unique())
             f_mes_c = st.sidebar.multiselect("Filtrar Mes:", meses_c, default=meses_c)
             if f_mes_c:
                 df_c_user = df_c_user[df_c_user[col_c_mes].isin(f_mes_c)]
 
-        # Filtro por NOMBRE DE CUENTA (Sin números)
         if col_nombre_mostrar and col_nombre_mostrar in df_c_user.columns:
             nombres_cuentas_unicas = sorted(
                 [str(c).strip() for c in df_c_user[col_nombre_mostrar].dropna().unique() if str(c).strip() != '-' and str(c).strip() != 'nan']
@@ -997,91 +991,89 @@ elif modulo_seleccionado == "🛒 Compras":
             if f_cta_nom_c:
                 df_c_user = df_c_user[df_c_user[col_nombre_mostrar].astype(str).str.strip().isin(f_cta_nom_c)]
 
-       # ---------------------------------------------------------
-        # MÉTRICAS Y GRÁFICOS OPTIMIZADOS
         # ---------------------------------------------------------
-        col_vg1, col_vg2 = st.columns([1.2, 1.1])
-        
-        with col_vg1:
-            st.markdown('<div class="chart-box-title">📅 Evolución Mensual de Consumos</div>', unsafe_allow_html=True)
-            if col_v_mes and col_v_monto and col_v_mes in df_v_user.columns:
-                df_v_user[col_v_monto] = pd.to_numeric(df_v_user[col_v_monto], errors='coerce').fillna(0)
-                
-                # 1. Normalizar fecha a formato estricto YYYY-MM como texto
-                df_v_user['MES_CATEGORIA'] = pd.to_datetime(df_v_user[col_v_mes], errors='coerce').dt.strftime('%Y-%m')
-                df_v_user['MES_CATEGORIA'] = df_v_user['MES_CATEGORIA'].fillna(df_v_user[col_v_mes].astype(str))
-                
-                g_mes_v = df_v_user.groupby('MES_CATEGORIA')[col_v_monto].apply(lambda x: abs(x.sum())).reset_index()
-                g_mes_v = g_mes_v.sort_values(by='MES_CATEGORIA')
+        # 4. MÉTRICAS Y GRÁFICOS OPTIMIZADOS
+        # ---------------------------------------------------------
+        compras_totales = len(df_c_user)
+        monto_total_c = abs(pd.to_numeric(df_c_user[col_c_monto], errors='coerce').sum()) if col_c_monto else 0
+        promedio_compra = (monto_total_c / compras_totales) if compras_totales > 0 else 0
 
-                fig_mv = px.bar(
-                    g_mes_v, 
+        kc1, kc2, kc3 = st.columns(3)
+        with kc1:
+            st.markdown(f'<div class="custom-card"><div class="card-title">Monto Total Compras</div><div class="card-value">{formato_moneda(monto_total_c)}</div></div>', unsafe_allow_html=True)
+        with kc2:
+            st.markdown(f'<div class="custom-card"><div class="card-title">Cantidad de Registros</div><div class="card-value">{compras_totales:,}</div></div>', unsafe_allow_html=True)
+        with kc3:
+            st.markdown(f'<div class="custom-card"><div class="card-title">Promedio por Registro</div><div class="card-value">{formato_moneda(promedio_compra)}</div></div>', unsafe_allow_html=True)
+
+        col_cg1, col_cg2 = st.columns([1.2, 1.1])
+        
+        with col_cg1:
+            st.markdown('<div class="chart-box-title">📅 Evolución Mensual de Compras</div>', unsafe_allow_html=True)
+            if col_c_mes and col_c_monto and col_c_mes in df_c_user.columns:
+                df_c_user[col_c_monto] = pd.to_numeric(df_c_user[col_c_monto], errors='coerce').fillna(0)
+                
+                df_c_user['MES_CATEGORIA'] = pd.to_datetime(df_c_user[col_c_mes], errors='coerce').dt.strftime('%Y-%m')
+                df_c_user['MES_CATEGORIA'] = df_c_user['MES_CATEGORIA'].fillna(df_c_user[col_c_mes].astype(str))
+                
+                g_mes_c = df_c_user.groupby('MES_CATEGORIA')[col_c_monto].apply(lambda x: abs(x.sum())).reset_index()
+                g_mes_c = g_mes_c.sort_values(by='MES_CATEGORIA')
+
+                fig_mc = px.bar(
+                    g_mes_c, 
                     x='MES_CATEGORIA', 
-                    y=col_v_monto, 
+                    y=col_c_monto, 
                     color_discrete_sequence=['#E61C24']
                 )
                 
-                # Forzar eje X categórico explícito (evita milisegundos)
-                fig_mv.update_xaxes(type='category', title="")
-                fig_mv.update_yaxes(title="")
-                fig_mv.update_traces(hovertemplate='<b>Mes:</b> %{x}<br><b>Total:</b> $%{y:,.0f}')
+                fig_mc.update_xaxes(type='category', title="")
+                fig_mc.update_yaxes(title="")
+                fig_mc.update_traces(hovertemplate='<b>Mes:</b> %{x}<br><b>Total:</b> $%{y:,.0f}')
                 
-                fig_mv.update_layout(
-                    autosize=True, 
-                    paper_bgcolor='#1F2937', 
-                    plot_bgcolor='#1F2937', 
-                    font=dict(color='#FFFFFF'),
-                    height=300, 
-                    margin=dict(l=15, r=15, t=15, b=25)
+                fig_mc.update_layout(
+                    autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
+                    height=300, margin=dict(l=15, r=15, t=15, b=25)
                 )
-                st.plotly_chart(fig_mv, use_container_width=True, config=PLOTLY_CONFIG)
+                st.plotly_chart(fig_mc, use_container_width=True, config=PLOTLY_CONFIG)
 
-        with col_vg2:
+        with col_cg2:
             st.markdown('<div class="chart-box-title">📊 Distribución por Nombre de Cuenta</div>', unsafe_allow_html=True)
-            if col_nombre_mostrar and col_v_monto and col_nombre_mostrar in df_v_user.columns:
-                df_v_user[col_v_monto] = pd.to_numeric(df_v_user[col_v_monto], errors='coerce').fillna(0)
+            if col_nombre_mostrar and col_c_monto and col_nombre_mostrar in df_c_user.columns:
+                df_c_user[col_c_monto] = pd.to_numeric(df_c_user[col_c_monto], errors='coerce').fillna(0)
                 
-                # Agrupar montos por cuenta
-                g_cta_v = df_v_user.groupby(col_nombre_mostrar)[col_v_monto].apply(lambda x: abs(x.sum())).reset_index()
-                total_monto = g_cta_v[col_v_monto].sum()
+                g_cta_c = df_c_user.groupby(col_nombre_mostrar)[col_c_monto].apply(lambda x: abs(x.sum())).reset_index()
+                total_monto_c = g_cta_c[col_c_monto].sum()
 
-                if total_monto > 0:
-                    # Agrupar cuentas con participación menor al 2% en "OTROS" para evitar desborde visual
-                    g_cta_v['PCT'] = (g_cta_v[col_v_monto] / total_monto) * 100
-                    principales = g_cta_v[g_cta_v['PCT'] >= 2.0].copy()
-                    otros_monto = g_cta_v[g_cta_v['PCT'] < 2.0][col_v_monto].sum()
+                if total_monto_c > 0:
+                    g_cta_c['PCT'] = (g_cta_c[col_c_monto] / total_monto_c) * 100
+                    principales_c = g_cta_c[g_cta_c['PCT'] >= 2.0].copy()
+                    otros_monto_c = g_cta_c[g_cta_c['PCT'] < 2.0][col_c_monto].sum()
 
-                    if otros_monto > 0:
-                        fila_otros = pd.DataFrame([{col_nombre_mostrar: 'OTROS CONSUMOS', col_v_monto: otros_monto, 'PCT': (otros_monto/total_monto)*100}])
-                        g_cta_v = pd.concat([principales, fila_otros], ignore_index=True)
+                    if otros_monto_c > 0:
+                        fila_otros = pd.DataFrame([{col_nombre_mostrar: 'OTRAS COMPRAS', col_c_monto: otros_monto_c, 'PCT': (otros_monto_c/total_monto_c)*100}])
+                        g_cta_c = pd.concat([principales_c, fila_otros], ignore_index=True)
                     else:
-                        g_cta_v = principales
+                        g_cta_c = principales_c
                 
-                g_cta_v = g_cta_v.sort_values(by=col_v_monto, ascending=False)
+                g_cta_c = g_cta_c.sort_values(by=col_c_monto, ascending=False)
                 
-                fig_cv = px.pie(
-                    g_cta_v, 
-                    values=col_v_monto, 
+                fig_cc = px.pie(
+                    g_cta_c, 
+                    values=col_c_monto, 
                     names=col_nombre_mostrar, 
                     hole=0.45, 
                     color_discrete_sequence=['#E61C24', '#4B5563', '#9CA3AF', '#374151', '#D1D5DB']
                 )
                 
-                # Solo muestra porcentaje dentro de la dona para evitar solapamientos de texto
-                fig_cv.update_traces(
+                fig_cc.update_traces(
                     textposition='inside', 
                     textinfo='percent',
                     hovertemplate='<b>%{label}</b><br>Monto: $%{value:,.0f}<br>Porcentaje: %{percent}'
                 )
                 
-                # Leyenda horizontal en la parte inferior para que no recorte nombres largos
-                fig_cv.update_layout(
-                    autosize=True, 
-                    paper_bgcolor='#1F2937', 
-                    plot_bgcolor='#1F2937', 
-                    font=dict(color='#FFFFFF'),
-                    height=300, 
-                    margin=dict(l=15, r=15, t=10, b=45),
+                fig_cc.update_layout(
+                    autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
+                    height=300, margin=dict(l=15, r=15, t=10, b=45),
                     legend=dict(
                         orientation="h",
                         y=-0.2,
@@ -1089,7 +1081,7 @@ elif modulo_seleccionado == "🛒 Compras":
                         font=dict(color='#FFFFFF', size=11)
                     )
                 )
-                st.plotly_chart(fig_cv, use_container_width=True, config=PLOTLY_CONFIG)
+                st.plotly_chart(fig_cc, use_container_width=True, config=PLOTLY_CONFIG)
 
         # ---------------------------------------------------------
         # 5. TABLA GENERAL
@@ -1099,8 +1091,7 @@ elif modulo_seleccionado == "🛒 Compras":
 
         search_c = st.text_input("🔎 Buscar por Nombre de Cuenta, Proveedor o Detalles:", "")
         
-        # Ocultar columnas internas auxiliares del cruce
-        cols_ocultar_c = ['KEY_CTA', 'RESPONSABLE_MAP']
+        cols_ocultar_c = ['KEY_CTA', 'RESPONSABLE_MAP', 'MES_CATEGORIA']
         df_c_render = df_c_user.drop(columns=[c for c in cols_ocultar_c if c in df_c_user.columns]).copy()
 
         if search_c:
