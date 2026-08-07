@@ -13,18 +13,16 @@ st.set_page_config(
     initial_sidebar_state="auto"
 )
 
-# Configuración de reescalado para Plotly
 PLOTLY_CONFIG = {
     'responsive': True,
     'displayModeBar': False
 }
 
 # ---------------------------------------------------------
-# ESTILOS CSS (Nitidez, Zoom & Contenedores)
+# ESTILOS CSS
 # ---------------------------------------------------------
 st.markdown("""
     <style>
-    /* 1. TIPOGRAFÍA Y NITIDEZ GLOBAL */
     html, body, [class*="css"], .stApp {
         font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
         -webkit-font-smoothing: antialiased !important;
@@ -36,7 +34,6 @@ st.markdown("""
         background-color: #0E1117 !important;
     }
 
-    /* Ocultar textos sr-only */
     .sr-only, 
     [data-testid="stSidebar"] .sr-only, 
     div[data-baseweb="input"] span[class*="sr-only"],
@@ -52,9 +49,6 @@ st.markdown("""
         border: 0 !important;
     }
 
-    /* ------------------------------------
-       ESTILIZACIÓN DE TÍTULOS DE GRÁFICOS (FIX ZOOM)
-    ------------------------------------ */
     .chart-box-title {
         font-size: 16px !important;
         font-weight: 700 !important;
@@ -66,9 +60,6 @@ st.markdown("""
         line-height: 1.2;
     }
 
-    /* ------------------------------------
-       TARJETA DE LOGIN Y CAMPOS
-    ------------------------------------ */
     div[data-testid="stForm"] {
         background-color: #1A1D24 !important;
         border-radius: 16px !important;
@@ -143,9 +134,6 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(230, 28, 36, 0.4) !important;
     }
 
-    /* ------------------------------------
-       SIDEBAR Y FILE UPLOADER
-    ------------------------------------ */
     section[data-testid="stSidebar"] {
         background-color: #111827 !important;
     }
@@ -178,9 +166,6 @@ st.markdown("""
         border-color: #E61C24 !important;
     }
 
-    /* ------------------------------------
-       MENÚS DESPLEGABLES (MULTISELECTS)
-    ------------------------------------ */
     div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"] {
         background-color: #1F2937 !important;
         border: 1px solid #374151 !important;
@@ -210,9 +195,6 @@ st.markdown("""
         font-weight: 600 !important;
     }
 
-    /* ------------------------------------
-       ESTILOS DEL DASHBOARD PRINCIPAL
-    ------------------------------------ */
     .main-header {
         background: linear-gradient(135deg, #111827 0%, #E61C24 100%);
         padding: 20px 25px;
@@ -309,7 +291,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# FUNCIONES AUXILIARES Y DATOS
+# FUNCIONES AUXILIARES Y LECTURA MULTI-HOJA
 # ---------------------------------------------------------
 def formato_moneda(valor, con_decimales=False):
     if pd.isna(valor):
@@ -320,27 +302,65 @@ def formato_moneda(valor, con_decimales=False):
         res = f"{valor:,.0f}"
     return "$ " + res.replace(',', 'X').replace('.', ',').replace('X', '.')
 
+def obtener_columna(df, opciones):
+    for op in opciones:
+        for c in df.columns:
+            if str(c).strip().upper() == op.upper():
+                return c
+    return None
+
 @st.cache_data
-def cargar_datos(file):
-    df = pd.read_excel(file)
-    if 'MES' in df.columns:
-        df['MES_DT'] = pd.to_datetime(df['MES'])
-        df['MES_NOMBRE'] = df['MES_DT'].dt.strftime('%Y-%m')
-    
-    cols_texto = ['INTERNO', 'DES1', 'DES2', 'TEXTO INTERNO', 'DESC CTA CBLE', 'RAZON', 'COMPROBANTE']
-    for c in cols_texto:
-        if c in df.columns:
-            df[c] = df[c].fillna('-')
-            
-    return df
+def cargar_datos_multihoja(file):
+    xls = pd.ExcelFile(file)
+    hojas = xls.sheet_names
+
+    # 1. Hoja Principal (Presupuesto y Gastos)
+    df_main = pd.read_excel(xls, sheet_name=hojas[0])
+    if 'MES' in df_main.columns:
+        df_main['MES_DT'] = pd.to_datetime(df_main['MES'], errors='coerce')
+        df_main['MES_NOMBRE'] = df_main['MES_DT'].dt.strftime('%Y-%m')
+    for c in ['INTERNO', 'DES1', 'DES2', 'TEXTO INTERNO', 'DESC CTA CBLE', 'RAZON', 'COMPROBANTE']:
+        if c in df_main.columns:
+            df_main[c] = df_main[c].fillna('-')
+
+    # 2. Hoja Vales de Consumo
+    df_vales = pd.DataFrame()
+    nombre_hoja_vales = next((h for h in hojas if 'VALE' in h.upper()), None)
+    if nombre_hoja_vales:
+        df_vales = pd.read_excel(xls, sheet_name=nombre_hoja_vales)
+    elif len(hojas) > 1:
+        df_vales = pd.read_excel(xls, sheet_name=hojas[1])
+
+    if not df_vales.empty:
+        col_fecha_v = obtener_columna(df_vales, ['FECHA', 'MES'])
+        if col_fecha_v:
+            df_vales['MES_DT'] = pd.to_datetime(df_vales[col_fecha_v], errors='coerce')
+            df_vales['MES_NOMBRE'] = df_vales['MES_DT'].dt.strftime('%Y-%m')
+
+    # 3. Hoja Compras
+    df_compras = pd.DataFrame()
+    nombre_hoja_compras = next((h for h in hojas if 'COMPRA' in h.upper()), None)
+    if nombre_hoja_compras:
+        df_compras = pd.read_excel(xls, sheet_name=nombre_hoja_compras)
+    elif len(hojas) > 2:
+        df_compras = pd.read_excel(xls, sheet_name=hojas[2])
+
+    if not df_compras.empty:
+        col_fecha_c = obtener_columna(df_compras, ['FECHA', 'MES'])
+        if col_fecha_c:
+            df_compras['MES_DT'] = pd.to_datetime(df_compras[col_fecha_c], errors='coerce')
+            df_compras['MES_NOMBRE'] = df_compras['MES_DT'].dt.strftime('%Y-%m')
+
+    return {'main': df_main, 'vales': df_vales, 'compras': df_compras}
 
 @st.cache_data
 def obtener_base_inicial():
     try:
-        return cargar_datos("Base Dashboard.xlsx")
+        return cargar_datos_multihoja("Base Dashboard.xlsx")
     except Exception:
         return None
 
+# Estado de sesión
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 if 'user' not in st.session_state:
@@ -351,7 +371,7 @@ if 'df_data' not in st.session_state:
     st.session_state['df_data'] = obtener_base_inicial()
 
 # ---------------------------------------------------------
-# LOGIN SCREEN (CON ÍCONO 🥤)
+# LOGIN SCREEN
 # ---------------------------------------------------------
 if not st.session_state['logged_in']:
     st.markdown("<br><br>", unsafe_allow_html=True)
@@ -359,7 +379,6 @@ if not st.session_state['logged_in']:
     
     with col_l2:
         with st.form("login_form"):
-            # ÍCONO DE VASO CON SORBETE 🥤
             st.markdown("""
                 <div style="text-align: center; font-size: 55px; margin-bottom: 10px; line-height: 1;">
                     🥤
@@ -375,15 +394,16 @@ if not st.session_state['logged_in']:
             
             if submit_login:
                 if user_input and pass_input:
-                    df_temp = st.session_state['df_data']
+                    data_dict = st.session_state['df_data']
                     
                     if user_input.lower() == "admin" and pass_input == "admin@":
                         st.session_state['logged_in'] = True
                         st.session_state['user'] = "ADMINISTRADOR"
                         st.session_state['is_admin'] = True
                         st.rerun()
-                    elif df_temp is not None:
-                        responsables = [str(r).upper() for r in df_temp['RESPONSABLE'].dropna().unique()]
+                    elif data_dict is not None and not data_dict['main'].empty:
+                        df_m = data_dict['main']
+                        responsables = [str(r).upper() for r in df_m['RESPONSABLE'].dropna().unique()]
                         u_upper = user_input.upper()
                         pass_esperado = user_input.lower() + "@"
                         
@@ -401,11 +421,10 @@ if not st.session_state['logged_in']:
     st.stop()
 
 # ---------------------------------------------------------
-# MAIN DASHBOARD
+# NAVEGACIÓN Y SIDEBAR GLOBAL
 # ---------------------------------------------------------
-df = st.session_state['df_data']
+data_dict = st.session_state['df_data']
 
-# Sidebar
 st.sidebar.markdown(f"👤 **Usuario Activo:** `{st.session_state['user']}`")
 if st.session_state['is_admin']:
     st.sidebar.caption("🔑 Perfil: Administrador General")
@@ -420,262 +439,401 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
 
 st.sidebar.markdown("---")
 
+# Carga de archivos para Administrador
 if st.session_state['is_admin']:
     st.sidebar.subheader("📤 Actualizar Base de Datos")
-    new_file = st.sidebar.file_uploader("Subir Excel Principal", type=["xlsx"])
+    new_file = st.sidebar.file_uploader("Subir Excel Completo (Multi-hoja)", type=["xlsx"])
     if new_file is not None:
-        st.session_state['df_data'] = cargar_datos(new_file)
-        df = st.session_state['df_data']
+        st.session_state['df_data'] = cargar_datos_multihoja(new_file)
+        data_dict = st.session_state['df_data']
         st.sidebar.success("✅ Base de datos actualizada")
 
-# Header Principal
-st.markdown(f"""
-    <div class="main-header">
-        <h2>📊 Control de Presupuesto y Gastos Fijos</h2>
-        <p>Reginald Lee S.A. | Vista Ejecutiva — Usuario: <b>{st.session_state['user']}</b></p>
-    </div>
-""", unsafe_allow_html=True)
+# Selector de Módulo Principal
+st.sidebar.subheader("📌 Módulos de Control")
+modulo_seleccionado = st.sidebar.radio(
+    "Seleccione Vista:",
+    ["📊 Presupuesto y Gastos", "🎟️ Vales de Consumo", "🛒 Compras"],
+    index=0
+)
 
-if df is not None:
-    if not st.session_state['is_admin']:
-        df_user = df[df['RESPONSABLE'].astype(str).str.upper() == st.session_state['user']]
+# ---------------------------------------------------------
+# MÓDULO 1: PRESUPUESTO Y GASTOS
+# ---------------------------------------------------------
+if modulo_seleccionado == "📊 Presupuesto y Gastos":
+    st.markdown(f"""
+        <div class="main-header">
+            <h2>📊 Control de Presupuesto y Gastos Fijos</h2>
+            <p>Reginald Lee S.A. | Vista Ejecutiva — Usuario: <b>{st.session_state['user']}</b></p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    df_main = data_dict['main'] if data_dict else pd.DataFrame()
+
+    if not df_main.empty:
+        if not st.session_state['is_admin']:
+            df_user = df_main[df_main['RESPONSABLE'].astype(str).str.upper() == st.session_state['user']]
+        else:
+            df_user = df_main.copy()
+
+        st.sidebar.subheader("🎯 Filtros Presupuestarios")
+        meses_disp = sorted(df_user['MES_NOMBRE'].dropna().unique())
+        locs_disp = sorted(df_user['LOCACION'].dropna().unique())
+        grupos_disp = sorted(df_user['GRUPO DE CUENTAS'].dropna().unique())
+
+        f_mes = st.sidebar.multiselect("Meses", meses_disp, default=meses_disp)
+        f_loc = st.sidebar.multiselect("Locación / Planta", locs_disp, default=locs_disp)
+        f_grupo = st.sidebar.multiselect("Grupo de Cuentas", grupos_disp, default=grupos_disp)
+
+        if st.session_state['is_admin']:
+            resps_disp = sorted(df_user['RESPONSABLE'].dropna().unique())
+            f_resp = st.sidebar.multiselect("Responsable Sector", resps_disp, default=resps_disp)
+        else:
+            f_resp = [st.session_state['user']]
+
+        df_f = df_user[
+            (df_user['MES_NOMBRE'].isin(f_mes)) &
+            (df_user['LOCACION'].isin(f_loc)) &
+            (df_user['GRUPO DE CUENTAS'].isin(f_grupo)) &
+            (df_user['RESPONSABLE'].astype(str).str.upper().isin(f_resp))
+        ]
+
+        presupuesto_df = df_f[df_f['TIPO2'] == 'PRESUPUESTO']
+        gasto_df = df_f[df_f['TIPO2'] == 'GASTO']
+
+        tot_presupuesto = presupuesto_df['SALDO'].sum()
+        tot_gasto = abs(gasto_df['SALDO'].sum())
+        desviacion = tot_gasto - tot_presupuesto
+        pct_ejecucion = (tot_gasto / tot_presupuesto * 100) if tot_presupuesto > 0 else 0
+
+        # KPIs
+        k1, k2, k3, k4 = st.columns(4)
+        with k1:
+            st.markdown(f'<div class="custom-card"><div class="card-title">Presupuesto Asignado</div><div class="card-value">{formato_moneda(tot_presupuesto)}</div></div>', unsafe_allow_html=True)
+        with k2:
+            st.markdown(f'<div class="custom-card"><div class="card-title">Gasto Real Ejecutado</div><div class="card-value">{formato_moneda(tot_gasto)}</div></div>', unsafe_allow_html=True)
+        with k3:
+            sub_color = "text-red" if desviacion > 0 else "text-green"
+            st.markdown(f'<div class="custom-card"><div class="card-title">Desviación Presupuestaria</div><div class="card-value">{formato_moneda(desviacion)}</div><div class="card-sub {sub_color}">Diferencia acumulada</div></div>', unsafe_allow_html=True)
+        with k4:
+            st.markdown(f'<div class="custom-card"><div class="card-title">% Ejecución Presupuestaria</div><div class="card-value">{pct_ejecucion:.1f}%</div><div class="card-sub text-red" style="visibility: {"visible" if pct_ejecucion > 100 else "hidden"};">Excedido de Presupuesto</div></div>', unsafe_allow_html=True)
+
+        # Gráficos
+        col_g1, col_g2, col_g3 = st.columns([1.3, 1.1, 1.0])
+        with col_g1:
+            st.markdown('<div class="chart-box-title">📅 Presupuesto vs Real por Mes</div>', unsafe_allow_html=True)
+            p_mes = presupuesto_df.groupby('MES_NOMBRE')['SALDO'].sum().reset_index().rename(columns={'SALDO': 'Presupuesto'})
+            g_mes = gasto_df.groupby('MES_NOMBRE')['SALDO'].apply(lambda x: abs(x.sum())).reset_index().rename(columns={'SALDO': 'Gasto Real'})
+            comp_mes = pd.merge(p_mes, g_mes, on='MES_NOMBRE', how='outer').fillna(0)
+
+            fig_mes = go.Figure()
+            fig_mes.add_trace(go.Bar(x=comp_mes['MES_NOMBRE'], y=comp_mes['Presupuesto'], name='Presupuesto', marker_color='#9CA3AF'))
+            fig_mes.add_trace(go.Bar(x=comp_mes['MES_NOMBRE'], y=comp_mes['Gasto Real'], name='Gasto Real', marker_color='#E61C24'))
+            fig_mes.update_layout(
+                autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
+                xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF', size=11), automargin=True),
+                yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF', size=11), automargin=True),
+                barmode='group', height=310, margin=dict(l=20, r=15, t=10, b=30),
+                legend=dict(orientation="h", y=1.18, x=0, font=dict(color='#FFFFFF', size=11))
+            )
+            st.plotly_chart(fig_mes, use_container_width=True, config=PLOTLY_CONFIG)
+
+        with col_g2:
+            st.markdown('<div class="chart-box-title">📊 Gasto por Grupo de Cuentas</div>', unsafe_allow_html=True)
+            g_grupo = gasto_df.groupby('GRUPO DE CUENTAS')['SALDO'].apply(lambda x: abs(x.sum())).reset_index().sort_values(by='SALDO', ascending=True).tail(7)
+            fig_grupo = px.bar(g_grupo, x='SALDO', y='GRUPO DE CUENTAS', orientation='h', color_discrete_sequence=['#E61C24'])
+            fig_grupo.update_layout(
+                autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
+                xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF', size=11), automargin=True),
+                yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF', size=10), automargin=True),
+                height=310, margin=dict(l=10, r=15, t=10, b=25), xaxis_title="", yaxis_title=""
+            )
+            st.plotly_chart(fig_grupo, use_container_width=True, config=PLOTLY_CONFIG)
+
+        with col_g3:
+            st.markdown('<div class="chart-box-title">🎯 Nivel de Ejecución</div>', unsafe_allow_html=True)
+            fig_gauge = go.Figure(go.Indicator(
+                mode = "gauge+number", value = pct_ejecucion,
+                number = {'suffix': "%", 'font': {'size': 26, 'color': '#FFFFFF'}},
+                gauge = {
+                    'axis': {'range': [0, max(120, pct_ejecucion)], 'tickcolor': "#FFFFFF", 'tickfont': {'color': '#FFFFFF', 'size': 11}},
+                    'bar': {'color': "#E61C24" if pct_ejecucion > 100 else "#9CA3AF"},
+                    'steps': [
+                        {'range': [0, 80], 'color': "#374151"},
+                        {'range': [80, 100], 'color': "#4B5563"},
+                        {'range': [100, max(120, pct_ejecucion)], 'color': "#991B1B"}
+                    ]
+                }
+            ))
+            fig_gauge.update_layout(
+                autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
+                height=310, margin=dict(l=35, r=35, t=35, b=25)
+            )
+            st.plotly_chart(fig_gauge, use_container_width=True, config=PLOTLY_CONFIG)
+
+        # Fila 2
+        c_r2_1, c_r2_2 = st.columns([1, 1.5])
+        with c_r2_1:
+            st.markdown('<div class="chart-box-title">🏢 Gastos por Locación</div>', unsafe_allow_html=True)
+            g_loc = gasto_df.groupby('LOCACION')['SALDO'].apply(lambda x: abs(x.sum())).reset_index()
+            fig_loc = px.pie(g_loc, values='SALDO', names='LOCACION', hole=0.4, color_discrete_sequence=['#E61C24', '#6B7280', '#9CA3AF', '#D1D5DB', '#374151'])
+            fig_loc.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(color='#FFFFFF'))
+            fig_loc.update_layout(
+                autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
+                height=300, margin=dict(l=15, r=15, t=15, b=15), legend=dict(font=dict(color='#FFFFFF'))
+            )
+            st.plotly_chart(fig_loc, use_container_width=True, config=PLOTLY_CONFIG)
+
+        with c_r2_2:
+            st.markdown('<div class="chart-box-title">⚠️ Cuentas con Mayor Desviación</div>', unsafe_allow_html=True)
+            p_cta = presupuesto_df.groupby('DESC CTA CBLE')['SALDO'].sum().rename('Presupuesto')
+            g_cta = gasto_df.groupby('DESC CTA CBLE')['SALDO'].apply(lambda x: abs(x.sum())).rename('Gasto Real')
+            comp_cta = pd.concat([p_cta, g_cta], axis=1).fillna(0)
+            comp_cta['Desviacion'] = comp_cta['Gasto Real'] - comp_cta['Presupuesto']
+            top_desv = comp_cta.sort_values(by='Desviacion', ascending=False).head(5).reset_index()
+
+            fig_desv = px.bar(top_desv, x='Desviacion', y='DESC CTA CBLE', orientation='h', color='Desviacion', color_continuous_scale=['#6B7280', '#E61C24'])
+            fig_desv.update_layout(
+                autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
+                xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
+                yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
+                height=300, margin=dict(l=15, r=15, t=15, b=15), xaxis_title="Desviación en $", yaxis_title=""
+            )
+            st.plotly_chart(fig_desv, use_container_width=True, config=PLOTLY_CONFIG)
+
+        # Auditoría Transaccional
+        st.markdown("---")
+        st.markdown("### 🔍 Consulta y Auditoría Transaccional de Gastos")
+
+        df_auditoria = gasto_df.copy()
+        cuentas_unicas = sorted(df_auditoria['DESC CTA CBLE'].dropna().unique())
+        col_f1, col_f2 = st.columns([2, 1])
+        with col_f1:
+            f_cuentas_tabla = st.multiselect("🔎 Filtrar por Cuenta Contable:", cuentas_unicas, default=[])
+        with col_f2:
+            search_kw = st.text_input("💬 Buscar por Proveedor / N° Interno:", "")
+
+        if f_cuentas_tabla:
+            df_auditoria = df_auditoria[df_auditoria['DESC CTA CBLE'].isin(f_cuentas_tabla)]
+        if search_kw:
+            sk = search_kw.lower()
+            mask = (
+                df_auditoria['DES1'].astype(str).str.lower().str.contains(sk) |
+                df_auditoria['INTERNO'].astype(str).str.lower().str.contains(sk) |
+                df_auditoria['TEXTO INTERNO'].astype(str).str.lower().str.contains(sk)
+            )
+            df_auditoria = df_auditoria[mask]
+
+        df_auditoria['MONTO_MOSTRAR'] = df_auditoria['SALDO'] * -1
+        df_auditoria['MONTO_FORMATO'] = df_auditoria['MONTO_MOSTRAR'].apply(lambda v: formato_moneda(v, con_decimales=True))
+
+        cols_tabla = ['FECHA', 'MES_NOMBRE', 'LOCACION', 'RESPONSABLE', 'GRUPO DE CUENTAS', 'DESC CTA CBLE', 'DES1', 'INTERNO', 'MONTO_FORMATO']
+        df_render = df_auditoria[cols_tabla].rename(columns={
+            'MES_NOMBRE': 'MES', 'DESC CTA CBLE': 'CUENTA CONTABLE', 'DES1': 'PROVEEDOR / ENTIDAD', 'INTERNO': 'N° INTERNO', 'MONTO_FORMATO': 'MONTO ($)'
+        })
+        st.dataframe(df_render, use_container_width=True, height=380)
+
+        # Inspector
+        st.markdown("#### 📌 Inspeccionar 'Texto Interno' de un Gasto Específico")
+        if not df_auditoria.empty:
+            opciones_inspeccion = df_auditoria.apply(
+                lambda r: f"ID {r.name} | {r['FECHA']} | {r['DES1']} | {formato_moneda(r['MONTO_MOSTRAR'], con_decimales=True)} | {r['DESC CTA CBLE']}", axis=1
+            ).tolist()
+            selected_option = st.selectbox("Seleccione una transacción para desplegar su detalle completo:", opciones_inspeccion)
+            if selected_option:
+                selected_id = int(selected_option.split(" | ")[0].replace("ID ", ""))
+                item_row = df_auditoria.loc[selected_id]
+                st.markdown(f"""
+                    <div class="detail-popup">
+                        <h5>📝 Texto Interno / Detalle Completo de la Compra</h5>
+                        <p>"{item_row['TEXTO INTERNO']}"</p>
+                        <hr>
+                        <small><b>Proveedor:</b> {item_row['DES1']} | <b>Cuenta:</b> {item_row['DESC CTA CBLE']} | <b>N° Interno:</b> {item_row['INTERNO']} | <b>Comprobante:</b> {item_row['COMPROBANTE']}</small>
+                    </div>
+                """, unsafe_allow_html=True)
+
+# ---------------------------------------------------------
+# MÓDULO 2: VALES DE CONSUMO
+# ---------------------------------------------------------
+elif modulo_seleccionado == "🎟️ Vales de Consumo":
+    st.markdown(f"""
+        <div class="main-header">
+            <h2>🎟️ Registro y Control de Vales de Consumo</h2>
+            <p>Consumos Internos por Sector | Usuario: <b>{st.session_state['user']}</b></p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    df_vales = data_dict['vales'] if data_dict else pd.DataFrame()
+
+    if df_vales.empty:
+        st.info("ℹ️ No se encontraron datos en la pestaña de 'Vales de Consumo'. Asegúrese de agregar la hoja al Excel.")
     else:
-        df_user = df.copy()
+        col_resp_v = obtener_columna(df_vales, ['RESPONSABLE', 'USUARIO', 'SOLICITANTE'])
+        col_monto_v = obtener_columna(df_vales, ['MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'VALOR'])
+        col_cuenta_v = obtener_columna(df_vales, ['CUENTA', 'GRUPO DE CUENTAS', 'DESC CTA CBLE', 'CONCEPTO', 'CATEGORIA'])
+        col_mes_v = 'MES_NOMBRE' if 'MES_NOMBRE' in df_vales.columns else obtener_columna(df_vales, ['MES', 'FECHA'])
 
-    # Filtros
-    st.sidebar.subheader("🎯 Filtros Generales")
-    meses_disponibles = sorted(df_user['MES_NOMBRE'].dropna().unique())
-    locaciones_disponibles = sorted(df_user['LOCACION'].dropna().unique())
-    grupos_disponibles = sorted(df_user['GRUPO DE CUENTAS'].dropna().unique())
+        # Filtrar por Usuario Logueado / Admin
+        if col_resp_v and not st.session_state['is_admin']:
+            df_v_user = df_vales[df_vales[col_resp_v].astype(str).str.upper() == st.session_state['user']]
+        else:
+            df_v_user = df_vales.copy()
 
-    f_mes = st.sidebar.multiselect("Meses", meses_disponibles, default=meses_disponibles)
-    f_loc = st.sidebar.multiselect("Locación / Planta", locaciones_disponibles, default=locaciones_disponibles)
-    f_grupo = st.sidebar.multiselect("Grupo de Cuentas", grupos_disponibles, default=grupos_disponibles)
-
-    if st.session_state['is_admin']:
-        resps_disponibles = sorted(df_user['RESPONSABLE'].dropna().unique())
-        f_resp = st.sidebar.multiselect("Responsable Sector", resps_disponibles, default=resps_disponibles)
-    else:
-        f_resp = [st.session_state['user']]
-
-    # Dataset Filtrado
-    df_f = df_user[
-        (df_user['MES_NOMBRE'].isin(f_mes)) &
-        (df_user['LOCACION'].isin(f_loc)) &
-        (df_user['GRUPO DE CUENTAS'].isin(f_grupo)) &
-        (df_user['RESPONSABLE'].astype(str).str.upper().isin(f_resp))
-    ]
-
-    presupuesto_df = df_f[df_f['TIPO2'] == 'PRESUPUESTO']
-    gasto_df = df_f[df_f['TIPO2'] == 'GASTO']
-
-    tot_presupuesto = presupuesto_df['SALDO'].sum()
-    tot_gasto = abs(gasto_df['SALDO'].sum())
-    desviacion = tot_gasto - tot_presupuesto
-    pct_ejecucion = (tot_gasto / tot_presupuesto * 100) if tot_presupuesto > 0 else 0
-
-    # KPI Cards
-    k1, k2, k3, k4 = st.columns(4)
-
-    with k1:
-        st.markdown(f"""
-            <div class="custom-card">
-                <div class="card-title">Presupuesto Asignado</div>
-                <div class="card-value">{formato_moneda(tot_presupuesto)}</div>
-            </div>
-        """, unsafe_allow_html=True)
-
-    with k2:
-        st.markdown(f"""
-            <div class="custom-card">
-                <div class="card-title">Gasto Real Ejecutado</div>
-                <div class="card-value">{formato_moneda(tot_gasto)}</div>
-            </div>
-        """, unsafe_allow_html=True)
-
-    with k3:
-        sub_color = "text-red" if desviacion > 0 else "text-green"
-        st.markdown(f"""
-            <div class="custom-card">
-                <div class="card-title">Desviación Presupuestaria</div>
-                <div class="card-value">{formato_moneda(desviacion)}</div>
-                <div class="card-sub {sub_color}">Diferencia acumulada</div>
-            </div>
-        """, unsafe_allow_html=True)
-
-    with k4:
-        st.markdown(f"""
-            <div class="custom-card">
-                <div class="card-title">% Ejecución Presupuestaria</div>
-                <div class="card-value">{pct_ejecucion:.1f}%</div>
-                <div class="card-sub text-red" style="visibility: {'visible' if pct_ejecucion > 100 else 'hidden'};">Excedido de Presupuesto</div>
-            </div>
-        """, unsafe_allow_html=True)
-
-    # ---------------------------------------------------------
-    # SECCIÓN GRÁFICOS
-    # ---------------------------------------------------------
-    col_g1, col_g2, col_g3 = st.columns([1.3, 1.1, 1.0])
-
-    with col_g1:
-        st.markdown('<div class="chart-box-title">📅 Presupuesto vs Real por Mes</div>', unsafe_allow_html=True)
-        p_mes = presupuesto_df.groupby('MES_NOMBRE')['SALDO'].sum().reset_index().rename(columns={'SALDO': 'Presupuesto'})
-        g_mes = gasto_df.groupby('MES_NOMBRE')['SALDO'].apply(lambda x: abs(x.sum())).reset_index().rename(columns={'SALDO': 'Gasto Real'})
-        comp_mes = pd.merge(p_mes, g_mes, on='MES_NOMBRE', how='outer').fillna(0)
-
-        fig_mes = go.Figure()
-        fig_mes.add_trace(go.Bar(x=comp_mes['MES_NOMBRE'], y=comp_mes['Presupuesto'], name='Presupuesto', marker_color='#9CA3AF'))
-        fig_mes.add_trace(go.Bar(x=comp_mes['MES_NOMBRE'], y=comp_mes['Gasto Real'], name='Gasto Real', marker_color='#E61C24'))
-        fig_mes.update_layout(
-            autosize=True,
-            paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
-            xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF', size=11), automargin=True),
-            yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF', size=11), automargin=True),
-            barmode='group', height=310, margin=dict(l=20, r=15, t=10, b=30),
-            legend=dict(orientation="h", y=1.18, x=0, font=dict(color='#FFFFFF', size=11))
-        )
-        st.plotly_chart(fig_mes, use_container_width=True, config=PLOTLY_CONFIG)
-
-    with col_g2:
-        st.markdown('<div class="chart-box-title">📊 Gasto por Grupo de Cuentas</div>', unsafe_allow_html=True)
-        g_grupo = gasto_df.groupby('GRUPO DE CUENTAS')['SALDO'].apply(lambda x: abs(x.sum())).reset_index().sort_values(by='SALDO', ascending=True).tail(7)
-        fig_grupo = px.bar(g_grupo, x='SALDO', y='GRUPO DE CUENTAS', orientation='h', color_discrete_sequence=['#E61C24'])
-        fig_grupo.update_layout(
-            autosize=True,
-            paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
-            xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF', size=11), automargin=True),
-            yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF', size=10), automargin=True),
-            height=310, margin=dict(l=10, r=15, t=10, b=25), xaxis_title="", yaxis_title=""
-        )
-        st.plotly_chart(fig_grupo, use_container_width=True, config=PLOTLY_CONFIG)
-
-    with col_g3:
-        st.markdown('<div class="chart-box-title">🎯 Nivel de Ejecución</div>', unsafe_allow_html=True)
-        fig_gauge = go.Figure(go.Indicator(
-            mode = "gauge+number",
-            value = pct_ejecucion,
-            number = {'suffix': "%", 'font': {'size': 26, 'color': '#FFFFFF', 'family': 'Arial'}},
-            gauge = {
-                'axis': {'range': [0, max(120, pct_ejecucion)], 'tickcolor': "#FFFFFF", 'tickfont': {'color': '#FFFFFF', 'size': 11}},
-                'bar': {'color': "#E61C24" if pct_ejecucion > 100 else "#9CA3AF"},
-                'steps': [
-                    {'range': [0, 80], 'color': "#374151"},
-                    {'range': [80, 100], 'color': "#4B5563"},
-                    {'range': [100, max(120, pct_ejecucion)], 'color': "#991B1B"}
-                ]
-            }
-        ))
-        fig_gauge.update_layout(
-            autosize=True,
-            paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
-            height=310, margin=dict(l=35, r=35, t=35, b=25)
-        )
-        st.plotly_chart(fig_gauge, use_container_width=True, config=PLOTLY_CONFIG)
-
-    # Segunda fila
-    c_r2_1, c_r2_2 = st.columns([1, 1.5])
-
-    with c_r2_1:
-        st.markdown('<div class="chart-box-title">🏢 Gastos por Locación</div>', unsafe_allow_html=True)
-        g_loc = gasto_df.groupby('LOCACION')['SALDO'].apply(lambda x: abs(x.sum())).reset_index()
-        fig_loc = px.pie(
-            g_loc, values='SALDO', names='LOCACION', hole=0.4,
-            color_discrete_sequence=['#E61C24', '#6B7280', '#9CA3AF', '#D1D5DB', '#374151']
-        )
-        fig_loc.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(color='#FFFFFF'))
-        fig_loc.update_layout(
-            autosize=True,
-            paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
-            height=300, margin=dict(l=15, r=15, t=15, b=15), legend=dict(font=dict(color='#FFFFFF'))
-        )
-        st.plotly_chart(fig_loc, use_container_width=True, config=PLOTLY_CONFIG)
-
-    with c_r2_2:
-        st.markdown('<div class="chart-box-title">⚠️ Cuentas con Mayor Desviación</div>', unsafe_allow_html=True)
-        p_cta = presupuesto_df.groupby('DESC CTA CBLE')['SALDO'].sum().rename('Presupuesto')
-        g_cta = gasto_df.groupby('DESC CTA CBLE')['SALDO'].apply(lambda x: abs(x.sum())).rename('Gasto Real')
-        comp_cta = pd.concat([p_cta, g_cta], axis=1).fillna(0)
-        comp_cta['Desviacion'] = comp_cta['Gasto Real'] - comp_cta['Presupuesto']
-        top_desv = comp_cta.sort_values(by='Desviacion', ascending=False).head(5).reset_index()
-
-        fig_desv = px.bar(
-            top_desv, x='Desviacion', y='DESC CTA CBLE', orientation='h',
-            color='Desviacion', color_continuous_scale=['#6B7280', '#E61C24']
-        )
-        fig_desv.update_layout(
-            autosize=True,
-            paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
-            xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
-            yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
-            height=300, margin=dict(l=15, r=15, t=15, b=15), xaxis_title="Desviación en $", yaxis_title=""
-        )
-        st.plotly_chart(fig_desv, use_container_width=True, config=PLOTLY_CONFIG)
-
-    # Tabla Transaccional
-    st.markdown("---")
-    st.markdown("### 🔍 Consulta y Auditoría Transaccional de Gastos")
-
-    df_auditoria = gasto_df.copy()
-
-    cuentas_unicas = sorted(df_auditoria['DESC CTA CBLE'].dropna().unique())
-    col_f1, col_f2 = st.columns([2, 1])
-    
-    with col_f1:
-        f_cuentas_tabla = st.multiselect("🔎 Filtrar por Cuenta Contable:", cuentas_unicas, default=[])
-    with col_f2:
-        search_kw = st.text_input("💬 Buscar por Proveedor / N° Interno:", "")
-
-    if f_cuentas_tabla:
-        df_auditoria = df_auditoria[df_auditoria['DESC CTA CBLE'].isin(f_cuentas_tabla)]
-
-    if search_kw:
-        sk = search_kw.lower()
-        mask = (
-            df_auditoria['DES1'].astype(str).str.lower().str.contains(sk) |
-            df_auditoria['INTERNO'].astype(str).str.lower().str.contains(sk) |
-            df_auditoria['TEXTO INTERNO'].astype(str).str.lower().str.contains(sk)
-        )
-        df_auditoria = df_auditoria[mask]
-
-    df_auditoria['MONTO_MOSTRAR'] = df_auditoria['SALDO'] * -1
-    df_auditoria['MONTO_FORMATO'] = df_auditoria['MONTO_MOSTRAR'].apply(lambda v: formato_moneda(v, con_decimales=True))
-
-    cols_tabla = [
-        'FECHA', 'MES_NOMBRE', 'LOCACION', 'RESPONSABLE', 
-        'GRUPO DE CUENTAS', 'DESC CTA CBLE', 'DES1', 'INTERNO', 'MONTO_FORMATO'
-    ]
-
-    df_render = df_auditoria[cols_tabla].rename(columns={
-        'MES_NOMBRE': 'MES',
-        'DESC CTA CBLE': 'CUENTA CONTABLE',
-        'DES1': 'PROVEEDOR / ENTIDAD',
-        'INTERNO': 'N° INTERNO',
-        'MONTO_FORMATO': 'MONTO ($)'
-    })
-
-    st.dataframe(df_render, use_container_width=True, height=380)
-
-    # Inspector
-    st.markdown("#### 📌 Inspeccionar 'Texto Interno' de un Gasto Específico")
-    
-    if not df_auditoria.empty:
-        opciones_inspeccion = df_auditoria.apply(
-            lambda r: f"ID {r.name} | {r['FECHA']} | {r['DES1']} | {formato_moneda(r['MONTO_MOSTRAR'], con_decimales=True)} | {r['DESC CTA CBLE']}", axis=1
-        ).tolist()
+        # Filtros Sidebar
+        st.sidebar.subheader("🎯 Filtros Vales de Consumo")
         
-        selected_option = st.selectbox("Seleccione una transacción para desplegar su detalle completo:", opciones_inspeccion)
-        
-        if selected_option:
-            selected_id = int(selected_option.split(" | ")[0].replace("ID ", ""))
-            item_row = df_auditoria.loc[selected_id]
-            
-            st.markdown(f"""
-                <div class="detail-popup">
-                    <h5>📝 Texto Interno / Detalle Completo de la Compra</h5>
-                    <p>"{item_row['TEXTO INTERNO']}"</p>
-                    <hr>
-                    <small><b>Proveedor:</b> {item_row['DES1']} | <b>Cuenta:</b> {item_row['DESC CTA CBLE']} | <b>N° Interno:</b> {item_row['INTERNO']} | <b>Comprobante:</b> {item_row['COMPROBANTE']}</small>
-                </div>
-            """, unsafe_allow_html=True)
+        if col_mes_v and col_mes_v in df_v_user.columns:
+            meses_v = sorted(df_v_user[col_mes_v].dropna().unique())
+            f_mes_v = st.sidebar.multiselect("Filtrar Mes:", meses_v, default=meses_v)
+            df_v_user = df_v_user[df_v_user[col_mes_v].isin(f_mes_v)]
+
+        if col_resp_v and st.session_state['is_admin']:
+            resps_v = sorted(df_v_user[col_resp_v].dropna().unique())
+            f_resp_v = st.sidebar.multiselect("Filtrar Responsable:", resps_v, default=resps_v)
+            df_v_user = df_v_user[df_v_user[col_resp_v].isin(f_resp_v)]
+
+        # Métricas principales
+        vales_totales = len(df_v_user)
+        monto_total_v = abs(df_v_user[col_monto_v].sum()) if col_monto_v else 0
+        promedio_vale = (monto_total_v / vales_totales) if vales_totales > 0 else 0
+
+        kv1, kv2, kv3 = st.columns(3)
+        with kv1:
+            st.markdown(f'<div class="custom-card"><div class="card-title">Monto Total Consumido</div><div class="card-value">{formato_moneda(monto_total_v)}</div></div>', unsafe_allow_html=True)
+        with kv2:
+            st.markdown(f'<div class="custom-card"><div class="card-title">Cantidad de Vales</div><div class="card-value">{vales_totales:,}</div></div>', unsafe_allow_html=True)
+        with kv3:
+            st.markdown(f'<div class="custom-card"><div class="card-title">Promedio por Vale</div><div class="card-value">{formato_moneda(promedio_vale)}</div></div>', unsafe_allow_html=True)
+
+        # Gráficos
+        col_vg1, col_vg2 = st.columns([1.3, 1])
+        with col_vg1:
+            st.markdown('<div class="chart-box-title">📅 Evolución Mensual de Consumos</div>', unsafe_allow_html=True)
+            if col_mes_v and col_monto_v and col_mes_v in df_v_user.columns:
+                g_mes_v = df_v_user.groupby(col_mes_v)[col_monto_v].apply(lambda x: abs(x.sum())).reset_index()
+                fig_mv = px.bar(g_mes_v, x=col_mes_v, y=col_monto_v, color_discrete_sequence=['#E61C24'])
+                fig_mv.update_layout(
+                    autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
+                    xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
+                    yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
+                    height=300, margin=dict(l=15, r=15, t=15, b=25), xaxis_title="", yaxis_title=""
+                )
+                st.plotly_chart(fig_mv, use_container_width=True, config=PLOTLY_CONFIG)
+
+        with col_vg2:
+            st.markdown('<div class="chart-box-title">📊 Distribución por Cuenta / Concepto</div>', unsafe_allow_html=True)
+            if col_cuenta_v and col_monto_v:
+                g_cta_v = df_v_user.groupby(col_cuenta_v)[col_monto_v].apply(lambda x: abs(x.sum())).reset_index()
+                fig_cv = px.pie(g_cta_v, values=col_monto_v, names=col_cuenta_v, hole=0.3, color_discrete_sequence=['#E61C24', '#9CA3AF', '#6B7280', '#374151'])
+                fig_cv.update_traces(textposition='inside', textinfo='percent+label')
+                fig_cv.update_layout(
+                    autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
+                    height=300, margin=dict(l=15, r=15, t=15, b=15)
+                )
+                st.plotly_chart(fig_cv, use_container_width=True, config=PLOTLY_CONFIG)
+
+        # Tabla de Vales
+        st.markdown("---")
+        st.markdown("### 📋 Registro Detallado de Vales de Consumo")
+
+        search_v = st.text_input("🔎 Buscar en Vales de Consumo:", "")
+        df_v_render = df_v_user.copy()
+
+        if search_v:
+            mask_v = df_v_render.astype(str).apply(lambda x: x.str.lower().str.contains(search_v.lower())).any(axis=1)
+            df_v_render = df_v_render[mask_v]
+
+        st.dataframe(df_v_render, use_container_width=True, height=380)
+
+# ---------------------------------------------------------
+# MÓDULO 3: COMPRAS
+# ---------------------------------------------------------
+elif modulo_seleccionado == "🛒 Compras":
+    st.markdown(f"""
+        <div class="main-header">
+            <h2>🛒 Gestión y Consulta de Compras</h2>
+            <p>Histórico de Adquisiciones | Usuario: <b>{st.session_state['user']}</b></p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    df_compras = data_dict['compras'] if data_dict else pd.DataFrame()
+
+    if df_compras.empty:
+        st.info("ℹ️ No se encontraron datos en la pestaña de 'Compras'. Asegúrese de agregar la hoja al Excel.")
     else:
-        st.info("No hay registros disponibles para inspeccionar con los filtros actuales.")
+        col_resp_c = obtener_columna(df_compras, ['RESPONSABLE', 'USUARIO', 'SOLICITANTE', 'COMPRADOR'])
+        col_monto_c = obtener_columna(df_compras, ['MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'PRECIO TOTAL'])
+        col_prov_c = obtener_columna(df_compras, ['PROVEEDOR', 'RAZON SOCIAL', 'DES1', 'ENTIDAD'])
+        col_mes_c = 'MES_NOMBRE' if 'MES_NOMBRE' in df_compras.columns else obtener_columna(df_compras, ['MES', 'FECHA'])
+
+        # Filtrar por Usuario Logueado / Admin
+        if col_resp_c and not st.session_state['is_admin']:
+            df_c_user = df_compras[df_compras[col_resp_c].astype(str).str.upper() == st.session_state['user']]
+        else:
+            df_c_user = df_compras.copy()
+
+        # Filtros Sidebar
+        st.sidebar.subheader("🎯 Filtros de Compras")
+
+        if col_mes_c and col_mes_c in df_c_user.columns:
+            meses_c = sorted(df_c_user[col_mes_c].dropna().unique())
+            f_mes_c = st.sidebar.multiselect("Filtrar Mes:", meses_c, default=meses_c)
+            df_c_user = df_c_user[df_c_user[col_mes_c].isin(f_mes_c)]
+
+        if col_resp_c and st.session_state['is_admin']:
+            resps_c = sorted(df_c_user[col_resp_c].dropna().unique())
+            f_resp_c = st.sidebar.multiselect("Filtrar Responsable:", resps_c, default=resps_c)
+            df_c_user = df_c_user[df_c_user[col_resp_c].isin(f_resp_c)]
+
+        # Métricas
+        compras_totales = len(df_c_user)
+        monto_total_c = abs(df_c_user[col_monto_c].sum()) if col_monto_c else 0
+        compra_maxima = abs(df_c_user[col_monto_c].max()) if col_monto_c and not df_c_user.empty else 0
+
+        kc1, kc2, kc3 = st.columns(3)
+        with kc1:
+            st.markdown(f'<div class="custom-card"><div class="card-title">Monto Total de Compras</div><div class="card-value">{formato_moneda(monto_total_c)}</div></div>', unsafe_allow_html=True)
+        with kc2:
+            st.markdown(f'<div class="custom-card"><div class="card-title">Operaciones de Compra</div><div class="card-value">{compras_totales:,}</div></div>', unsafe_allow_html=True)
+        with kc3:
+            st.markdown(f'<div class="custom-card"><div class="card-title">Mayor Compra Registrada</div><div class="card-value">{formato_moneda(compra_maxima)}</div></div>', unsafe_allow_html=True)
+
+        # Gráficos
+        col_cg1, col_cg2 = st.columns([1.3, 1])
+        with col_cg1:
+            st.markdown('<div class="chart-box-title">📅 Evolución de Compras Mensuales</div>', unsafe_allow_html=True)
+            if col_mes_c and col_monto_c and col_mes_c in df_c_user.columns:
+                g_mes_c = df_c_user.groupby(col_mes_c)[col_monto_c].apply(lambda x: abs(x.sum())).reset_index()
+                fig_mc = px.bar(g_mes_c, x=col_mes_c, y=col_monto_c, color_discrete_sequence=['#E61C24'])
+                fig_mc.update_layout(
+                    autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
+                    xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
+                    yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
+                    height=300, margin=dict(l=15, r=15, t=15, b=25), xaxis_title="", yaxis_title=""
+                )
+                st.plotly_chart(fig_mc, use_container_width=True, config=PLOTLY_CONFIG)
+
+        with col_cg2:
+            st.markdown('<div class="chart-box-title">🏢 Top Proveedores</div>', unsafe_allow_html=True)
+            if col_prov_c and col_monto_c:
+                g_prov_c = df_c_user.groupby(col_prov_c)[col_monto_c].apply(lambda x: abs(x.sum())).reset_index().sort_values(by=col_monto_c, ascending=True).tail(5)
+                fig_pc = px.bar(g_prov_c, x=col_monto_c, y=col_prov_c, orientation='h', color_discrete_sequence=['#9CA3AF'])
+                fig_pc.update_layout(
+                    autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
+                    xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
+                    yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
+                    height=300, margin=dict(l=15, r=15, t=15, b=15), xaxis_title="", yaxis_title=""
+                )
+                st.plotly_chart(fig_pc, use_container_width=True, config=PLOTLY_CONFIG)
+
+        # Tabla de Compras
+        st.markdown("---")
+        st.markdown("### 🛍️ Listado General de Compras")
+
+        search_c = st.text_input("🔎 Buscar en Compras:", "")
+        df_c_render = df_c_user.copy()
+
+        if search_c:
+            mask_c = df_c_render.astype(str).apply(lambda x: x.str.lower().str.contains(search_c.lower())).any(axis=1)
+            df_c_render = df_c_render[mask_c]
+
+        st.dataframe(df_c_render, use_container_width=True, height=380)
