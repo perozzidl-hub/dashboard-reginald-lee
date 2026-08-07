@@ -1003,7 +1003,7 @@ elif modulo_seleccionado == "🛒 Compras":
         with kc3:
             st.markdown(f'<div class="custom-card"><div class="card-title">Promedio por Registro</div><div class="card-value">{formato_moneda(promedio_compra)}</div></div>', unsafe_allow_html=True)
 
-col_cg1, col_cg2 = st.columns([1.2, 1.1])
+        col_cg1, col_cg2 = st.columns([1.2, 1.1])
         
         with col_cg1:
             st.markdown('<div class="chart-box-title">🏢 Top 5 Proveedores más Solicitados</div>', unsafe_allow_html=True)
@@ -1012,7 +1012,6 @@ col_cg1, col_cg2 = st.columns([1.2, 1.1])
             if col_c_prov and col_c_monto and col_c_prov in df_c_user.columns:
                 df_c_user[col_c_monto] = pd.to_numeric(df_c_user[col_c_monto], errors='coerce').fillna(0)
                 
-                # Agrupar por Proveedor y obtener el Top 5 por monto
                 g_prov_c = df_c_user.groupby(col_c_prov)[col_c_monto].apply(lambda x: abs(x.sum())).reset_index()
                 g_prov_c = g_prov_c.sort_values(by=col_c_monto, ascending=True).tail(5)
 
