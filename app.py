@@ -699,63 +699,98 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
     if df_vales.empty:
         st.info("ℹ️ No se encontraron datos en la pestaña de 'Vales de Consumo'. Asegúrese de agregar la hoja al Excel.")
     else:
-        # Mapeo de columnas flexible
-        col_monto_v = obtener_columna(df_vales, ['MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'VALOR', 'PRECIO TOTAL', 'NETO_TOTAL_FACTURA', 'CANTIDAD'])
-        col_cuenta_v = obtener_columna(df_vales, ['DESC CTA CBLE', 'CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'CONCEPTO', 'CATEGORIA', 'RUBRO', 'CATEGORÍA'])
-        col_mes_v = 'MES_NOMBRE' if 'MES_NOMBRE' in df_vales.columns else obtener_columna(df_vales, ['MES', 'FECHA'])
-        col_resp_directo = obtener_columna(df_vales, ['RESPONSABLE', 'USUARIO', 'SOLICITANTE', 'RETIRA', 'NOMBRE RETIRA'])
+        # ---------------------------------------------------------
+        # 1. CRUCE LÓGICO DE INFORMACIÓN (MAIN <-> VALES)
+        # ---------------------------------------------------------
+        # Mapear columnas clave en hoja Main
+        col_m_num_cta = obtener_columna(df_main, ['CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'NRO CUENTA', 'CODIGO'])
+        col_m_nom_cta = obtener_columna(df_main, ['DESC CTA CBLE', 'DESCRIPCION CUENTA', 'NOMBRE CUENTA', 'CUENTA_NORMALIZADA'])
+        col_m_resp = 'RESPONSABLE'
 
-        # Filtrado inteligente según Perfil
+        # Construir tabla de mapeo única de Cuentas -> Responsable y Nombre de Cuenta
+        if col_m_num_cta and col_m_nom_cta and col_m_resp in df_main.columns:
+            mapa_cuentas = df_main[[col_m_num_cta, col_m_nom_cta, col_m_resp]].drop_duplicates().copy()
+            mapa_cuentas[col_m_num_cta] = mapa_cuentas[col_m_num_cta].astype(str).str.strip()
+            mapa_cuentas[col_m_resp] = mapa_cuentas[col_m_resp].astype(str).str.strip().str.upper()
+        else:
+            mapa_cuentas = pd.DataFrame()
+
+        # Mapear columna de número de cuenta en la hoja Vales
+        col_v_num_cta = obtener_columna(df_vales, ['CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'NRO CUENTA', 'CODIGO'])
+        col_v_monto = obtener_columna(df_vales, ['MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'VALOR', 'PRECIO TOTAL', 'NETO_TOTAL_FACTURA', 'CANTIDAD'])
+        col_v_mes = 'MES_NOMBRE' if 'MES_NOMBRE' in df_vales.columns else obtener_columna(df_vales, ['MES', 'FECHA'])
+
+        df_v_trabajo = df_vales.copy()
+
+        # Realizar el cruce de datos si existe el número de cuenta en Vales
+        if col_v_num_cta and not mapa_cuentas.empty:
+            df_v_trabajo['KEY_CTA'] = df_v_trabajo[col_v_num_cta].astype(str).str.strip()
+            
+            # Unir con la tabla de mapeo principal por Número de Cuenta
+            df_v_trabajo = df_v_trabajo.merge(
+                mapa_cuentas.rename(columns={
+                    col_m_num_cta: 'KEY_CTA',
+                    col_m_nom_cta: 'NOMBRE_CUENTA_MAP',
+                    col_m_resp: 'RESPONSABLE_MAP'
+                }),
+                on='KEY_CTA',
+                how='left'
+            )
+            
+            # Nombre de la cuenta estandarizado
+            col_nombre_mostrar = 'NOMBRE_CUENTA_MAP'
+            col_resp_cruce = 'RESPONSABLE_MAP'
+        else:
+            # Fallback en caso de que no haya columna de número de cuenta
+            col_nombre_mostrar = obtener_columna(df_v_trabajo, ['DESC CTA CBLE', 'CONCEPTO', 'CATEGORIA', 'RUBRO'])
+            col_resp_cruce = obtener_columna(df_v_trabajo, ['RESPONSABLE', 'USUARIO', 'RETIRA'])
+
+        # ---------------------------------------------------------
+        # 2. FILTRADO POR RESPONSABLE LOGUEADO
+        # ---------------------------------------------------------
         if not st.session_state['is_admin']:
             u_user = st.session_state['user'].upper()
-            
-            # 1. Intentar filtrar por columna Responsable directa en Vales
-            mask_v = pd.Series(False, index=df_vales.index)
-            if col_resp_directo and col_resp_directo in df_vales.columns:
-                mask_v = mask_v | (df_vales[col_resp_directo].astype(str).str.upper().str.contains(u_user))
-
-            # 2. Obtener cuentas asociadas desde la hoja Main (tanto descripción como código)
-            cuentas_permitidas = obtener_cuentas_de_responsables(df_main, [u_user])
-            
-            if col_cuenta_v and col_cuenta_v in df_vales.columns and cuentas_permitidas:
-                # Coincidencia flexible de cuentas
-                mask_cta = df_vales[col_cuenta_v].astype(str).str.strip().str.upper().isin([c.upper() for c in cuentas_permitidas])
-                mask_v = mask_v | mask_cta
-
-            # Si se hallaron coincidencias aplicar filtro; si no, mostrar todos los datos donde participe como Responsable
-            if mask_v.any():
-                df_v_user = df_vales[mask_v].copy()
+            if col_resp_cruce in df_v_trabajo.columns:
+                df_v_user = df_v_trabajo[df_v_trabajo[col_resp_cruce].astype(str).str.upper() == u_user].copy()
             else:
-                df_v_user = df_vales.copy() # Resguardo si no encuentra coincidencia estricta
+                df_v_user = df_v_trabajo.copy()
         else:
             st.sidebar.subheader("🎯 Filtros Administrador")
             resps_disp = sorted(df_main['RESPONSABLE'].dropna().unique()) if not df_main.empty else []
             f_resp_v = st.sidebar.multiselect("Filtrar por Responsables:", resps_disp, default=resps_disp)
             
-            if f_resp_v and col_resp_directo and col_resp_directo in df_vales.columns:
+            if f_resp_v and col_resp_cruce in df_v_trabajo.columns:
                 resps_upper = [r.upper() for r in f_resp_v]
-                df_v_user = df_vales[df_vales[col_resp_directo].astype(str).str.upper().isin(resps_upper)].copy()
+                df_v_user = df_v_trabajo[df_v_trabajo[col_resp_cruce].astype(str).str.upper().isin(resps_upper)].copy()
             else:
-                df_v_user = df_vales.copy()
+                df_v_user = df_v_trabajo.copy()
 
-        # Filtros Adicionales en Sidebar
+        # ---------------------------------------------------------
+        # 3. FILTROS LATERALES (BUSQUEDA EXCLUSIVA POR NOMBRE DE CUENTA)
+        # ---------------------------------------------------------
         st.sidebar.subheader("🎯 Filtros Vales de Consumo")
         
-        if col_mes_v and col_mes_v in df_v_user.columns:
-            meses_v = sorted(df_v_user[col_mes_v].dropna().unique())
+        # Filtro por Mes
+        if col_v_mes and col_v_mes in df_v_user.columns:
+            meses_v = sorted(df_v_user[col_v_mes].dropna().unique())
             f_mes_v = st.sidebar.multiselect("Filtrar Mes:", meses_v, default=meses_v)
             if f_mes_v:
-                df_v_user = df_v_user[df_v_user[col_mes_v].isin(f_mes_v)]
+                df_v_user = df_v_user[df_v_user[col_v_mes].isin(f_mes_v)]
 
-        if col_cuenta_v and col_cuenta_v in df_v_user.columns:
-            cuentas_v_disp = sorted(df_v_user[col_cuenta_v].dropna().astype(str).unique())
-            f_cta_v = st.sidebar.multiselect("🔎 Filtrar Nombre de Cuenta / Categoría:", cuentas_v_disp, default=[])
-            if f_cta_v:
-                df_v_user = df_v_user[df_v_user[col_cuenta_v].astype(str).isin(f_cta_v)]
+        # Filtro por NOMBRE DE CUENTA (Sin números)
+        if col_nombre_mostrar and col_nombre_mostrar in df_v_user.columns:
+            nombres_cuentas_unicas = sorted(
+                [str(c).strip() for c in df_v_user[col_nombre_mostrar].dropna().unique() if str(c).strip() != '-' and str(c).strip() != 'nan']
+            )
+            f_cta_nom = st.sidebar.multiselect("🔎 Filtrar Nombre de Cuenta Contable:", nombres_cuentas_unicas, default=[])
+            if f_cta_nom:
+                df_v_user = df_v_user[df_v_user[col_nombre_mostrar].astype(str).str.strip().isin(f_cta_nom)]
 
-        # Métricas principales
+        # ---------------------------------------------------------
+        # 4. MÉTRICAS Y GRÁFICOS
+        # ---------------------------------------------------------
         vales_totales = len(df_v_user)
-        monto_total_v = abs(pd.to_numeric(df_v_user[col_monto_v], errors='coerce').sum()) if col_monto_v else 0
+        monto_total_v = abs(pd.to_numeric(df_v_user[col_v_monto], errors='coerce').sum()) if col_v_monto else 0
         promedio_vale = (monto_total_v / vales_totales) if vales_totales > 0 else 0
 
         kv1, kv2, kv3 = st.columns(3)
@@ -766,14 +801,13 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
         with kv3:
             st.markdown(f'<div class="custom-card"><div class="card-title">Promedio por Vale</div><div class="card-value">{formato_moneda(promedio_vale)}</div></div>', unsafe_allow_html=True)
 
-        # Gráficos
         col_vg1, col_vg2 = st.columns([1.3, 1])
         with col_vg1:
             st.markdown('<div class="chart-box-title">📅 Evolución Mensual de Consumos</div>', unsafe_allow_html=True)
-            if col_mes_v and col_monto_v and col_mes_v in df_v_user.columns:
-                df_v_user[col_monto_v] = pd.to_numeric(df_v_user[col_monto_v], errors='coerce').fillna(0)
-                g_mes_v = df_v_user.groupby(col_mes_v)[col_monto_v].apply(lambda x: abs(x.sum())).reset_index()
-                fig_mv = px.bar(g_mes_v, x=col_mes_v, y=col_monto_v, color_discrete_sequence=['#E61C24'])
+            if col_v_mes and col_v_monto and col_v_mes in df_v_user.columns:
+                df_v_user[col_v_monto] = pd.to_numeric(df_v_user[col_v_monto], errors='coerce').fillna(0)
+                g_mes_v = df_v_user.groupby(col_v_mes)[col_v_monto].apply(lambda x: abs(x.sum())).reset_index()
+                fig_mv = px.bar(g_mes_v, x=col_v_mes, y=col_v_monto, color_discrete_sequence=['#E61C24'])
                 fig_mv.update_layout(
                     autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
                     xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
@@ -783,11 +817,21 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
                 st.plotly_chart(fig_mv, use_container_width=True, config=PLOTLY_CONFIG)
 
         with col_vg2:
-            st.markdown('<div class="chart-box-title">📊 Distribución por Cuenta / Concepto</div>', unsafe_allow_html=True)
-            if col_cuenta_v and col_monto_v:
-                df_v_user[col_monto_v] = pd.to_numeric(df_v_user[col_monto_v], errors='coerce').fillna(0)
-                g_cta_v = df_v_user.groupby(col_cuenta_v)[col_monto_v].apply(lambda x: abs(x.sum())).reset_index().sort_values(by=col_monto_v, ascending=False).head(5)
-                fig_cv = px.pie(g_cta_v, values=col_monto_v, names=col_cuenta_v, hole=0.3, color_discrete_sequence=['#E61C24', '#9CA3AF', '#6B7280', '#374151', '#D1D5DB'])
+            st.markdown('<div class="chart-box-title">📊 Distribución por Nombre de Cuenta</div>', unsafe_allow_html=True)
+            if col_nombre_mostrar and col_v_monto and col_nombre_mostrar in df_v_user.columns:
+                df_v_user[col_v_monto] = pd.to_numeric(df_v_user[col_v_monto], errors='coerce').fillna(0)
+                
+                # Agrupar estrictamente por NOMBRE DE CUENTA
+                g_cta_v = df_v_user.groupby(col_nombre_mostrar)[col_v_monto].apply(lambda x: abs(x.sum())).reset_index()
+                g_cta_v = g_cta_v.sort_values(by=col_v_monto, ascending=False).head(5)
+                
+                fig_cv = px.pie(
+                    g_cta_v, 
+                    values=col_v_monto, 
+                    names=col_nombre_mostrar, 
+                    hole=0.3, 
+                    color_discrete_sequence=['#E61C24', '#9CA3AF', '#6B7280', '#374151', '#D1D5DB']
+                )
                 fig_cv.update_traces(textposition='inside', textinfo='percent+label')
                 fig_cv.update_layout(
                     autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
@@ -795,12 +839,17 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
                 )
                 st.plotly_chart(fig_cv, use_container_width=True, config=PLOTLY_CONFIG)
 
-        # Tabla de Vales
+        # ---------------------------------------------------------
+        # 5. TABLA GENERAL
+        # ---------------------------------------------------------
         st.markdown("---")
         st.markdown("### 📋 Registro Detallado de Vales de Consumo")
 
         search_v = st.text_input("🔎 Buscar por Nombre de Cuenta, Artículos o Detalles:", "")
-        df_v_render = df_v_user.copy()
+        
+        # Ocultar columnas internas auxiliares usadas para el cruce
+        cols_ocultar = ['KEY_CTA', 'RESPONSABLE_MAP']
+        df_v_render = df_v_user.drop(columns=[c for c in cols_ocultar if c in df_v_user.columns]).copy()
 
         if search_v:
             mask_v = df_v_render.astype(str).apply(lambda x: x.str.lower().str.contains(search_v.lower())).any(axis=1)
@@ -813,8 +862,8 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
 elif modulo_seleccionado == "🛒 Compras":
     st.markdown(f"""
         <div class="main-header">
-            <h2>🛒 Gestión y Consulta de Compras</h2>
-            <p>Histórico de Adquisiciones | Usuario: <b>{st.session_state['user']}</b></p>
+            <h2>🛒 Registro y Control de Compras</h2>
+            <p>Gestión de Órdenes y Proveedores | Usuario: <b>{st.session_state['user']}</b></p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -824,83 +873,112 @@ elif modulo_seleccionado == "🛒 Compras":
     if df_compras.empty:
         st.info("ℹ️ No se encontraron datos en la pestaña de 'Compras'. Asegúrese de agregar la hoja al Excel.")
     else:
-        col_monto_c = obtener_columna(df_compras, ['NETO_TOTAL_FACTURA', 'MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'PRECIO TOTAL'])
-        col_prov_c = obtener_columna(df_compras, ['RAZ_SOCIAL', 'PROVEEDOR', 'RAZON SOCIAL', 'DES1', 'ENTIDAD'])
-        col_cuenta_c = obtener_columna(df_compras, ['DESC CTA CBLE', 'CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'CONCEPTO'])
-        col_mes_c = 'MES_NOMBRE' if 'MES_NOMBRE' in df_compras.columns else obtener_columna(df_compras, ['Fec Cmpte', 'MES', 'FECHA'])
-        col_resp_c = obtener_columna(df_compras, ['RESPONSABLE', 'USUARIO', 'SOLICITANTE', 'COMPRADOR'])
+        # ---------------------------------------------------------
+        # 1. CRUCE LÓGICO DE INFORMACIÓN (MAIN <-> COMPRAS)
+        # ---------------------------------------------------------
+        col_m_num_cta = obtener_columna(df_main, ['CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'NRO CUENTA', 'CODIGO'])
+        col_m_nom_cta = obtener_columna(df_main, ['DESC CTA CBLE', 'DESCRIPCION CUENTA', 'NOMBRE CUENTA', 'CUENTA_NORMALIZADA'])
+        col_m_resp = 'RESPONSABLE'
 
-        # Filtrado de cuentas asociadas según responsable
-        if not st.session_state['is_admin']:
-            resps_activos = [st.session_state['user']]
-            cuentas_permitidas = obtener_cuentas_de_responsables(df_main, resps_activos)
-            
-            if col_resp_c and col_resp_c in df_compras.columns:
-                mask_user_c = (df_compras[col_resp_c].astype(str).str.upper() == st.session_state['user'])
-                if col_cuenta_c:
-                    mask_user_c = mask_user_c | (df_compras[col_cuenta_c].astype(str).str.strip().isin(cuentas_permitidas))
-                df_c_user = df_compras[mask_user_c].copy()
-            elif col_cuenta_c:
-                df_c_user = df_compras[df_compras[col_cuenta_c].astype(str).str.strip().isin(cuentas_permitidas)].copy()
-            else:
-                df_c_user = df_compras.copy()
+        # Construir tabla de mapeo de Cuentas -> Responsable y Nombre de Cuenta desde Main
+        if col_m_num_cta and col_m_nom_cta and col_m_resp in df_main.columns:
+            mapa_cuentas = df_main[[col_m_num_cta, col_m_nom_cta, col_m_resp]].drop_duplicates().copy()
+            mapa_cuentas[col_m_num_cta] = mapa_cuentas[col_m_num_cta].astype(str).str.strip()
+            mapa_cuentas[col_m_resp] = mapa_cuentas[col_m_resp].astype(str).str.strip().str.upper()
         else:
-            # Vista Administrador
+            mapa_cuentas = pd.DataFrame()
+
+        # Mapear columnas clave en la hoja Compras
+        col_c_num_cta = obtener_columna(df_compras, ['CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'NRO CUENTA', 'CODIGO'])
+        col_c_monto = obtener_columna(df_compras, ['MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'VALOR', 'PRECIO TOTAL', 'NETO_TOTAL_FACTURA', 'PRECIO', 'NETO'])
+        col_c_mes = 'MES_NOMBRE' if 'MES_NOMBRE' in df_compras.columns else obtener_columna(df_compras, ['MES', 'FECHA'])
+
+        df_c_trabajo = df_compras.copy()
+
+        # Realizar el cruce si existe el número de cuenta
+        if col_c_num_cta and not mapa_cuentas.empty:
+            df_c_trabajo['KEY_CTA'] = df_c_trabajo[col_c_num_cta].astype(str).str.strip()
+            
+            # Unir con el mapeo por Número de Cuenta
+            df_c_trabajo = df_c_trabajo.merge(
+                mapa_cuentas.rename(columns={
+                    col_m_num_cta: 'KEY_CTA',
+                    col_m_nom_cta: 'NOMBRE_CUENTA_MAP',
+                    col_m_resp: 'RESPONSABLE_MAP'
+                }),
+                on='KEY_CTA',
+                how='left'
+            )
+            
+            col_nombre_mostrar = 'NOMBRE_CUENTA_MAP'
+            col_resp_cruce = 'RESPONSABLE_MAP'
+        else:
+            col_nombre_mostrar = obtener_columna(df_c_trabajo, ['DESC CTA CBLE', 'CONCEPTO', 'CATEGORIA', 'RUBRO', 'PROVEEDOR'])
+            col_resp_cruce = obtener_columna(df_c_trabajo, ['RESPONSABLE', 'USUARIO', 'SOLICITANTE'])
+
+        # ---------------------------------------------------------
+        # 2. FILTRADO POR RESPONSABLE LOGUEADO
+        # ---------------------------------------------------------
+        if not st.session_state['is_admin']:
+            u_user = st.session_state['user'].upper()
+            if col_resp_cruce in df_c_trabajo.columns:
+                df_c_user = df_c_trabajo[df_c_trabajo[col_resp_cruce].astype(str).str.upper() == u_user].copy()
+            else:
+                df_c_user = df_c_trabajo.copy()
+        else:
             st.sidebar.subheader("🎯 Filtros Administrador")
             resps_disp = sorted(df_main['RESPONSABLE'].dropna().unique()) if not df_main.empty else []
             f_resp_c = st.sidebar.multiselect("Filtrar por Responsables:", resps_disp, default=resps_disp)
             
-            if f_resp_c:
-                cuentas_permitidas = obtener_cuentas_de_responsables(df_main, f_resp_c)
-                if col_resp_c and col_resp_c in df_compras.columns:
-                    mask_ac = df_compras[col_resp_c].astype(str).str.upper().isin([r.upper() for r in f_resp_c])
-                    if col_cuenta_c:
-                        mask_ac = mask_ac | df_compras[col_cuenta_c].astype(str).str.strip().isin(cuentas_permitidas)
-                    df_c_user = df_compras[mask_ac].copy()
-                elif col_cuenta_c:
-                    df_c_user = df_compras[df_compras[col_cuenta_c].astype(str).str.strip().isin(cuentas_permitidas)].copy()
-                else:
-                    df_c_user = df_compras.copy()
+            if f_resp_c and col_resp_cruce in df_c_trabajo.columns:
+                resps_upper = [r.upper() for r in f_resp_c]
+                df_c_user = df_c_trabajo[df_c_trabajo[col_resp_cruce].astype(str).str.upper().isin(resps_upper)].copy()
             else:
-                df_c_user = df_compras.copy()
+                df_c_user = df_c_trabajo.copy()
 
-        # Filtros Sidebar
-        st.sidebar.subheader("🎯 Filtros de Compras")
-
-        if col_mes_c and col_mes_c in df_c_user.columns:
-            meses_c = sorted(df_c_user[col_mes_c].dropna().unique())
+        # ---------------------------------------------------------
+        # 3. FILTROS LATERALES (BUSQUEDA EXCLUSIVA POR NOMBRE DE CUENTA)
+        # ---------------------------------------------------------
+        st.sidebar.subheader("🎯 Filtros Compras")
+        
+        # Filtro por Mes
+        if col_c_mes and col_c_mes in df_c_user.columns:
+            meses_c = sorted(df_c_user[col_c_mes].dropna().unique())
             f_mes_c = st.sidebar.multiselect("Filtrar Mes:", meses_c, default=meses_c)
             if f_mes_c:
-                df_c_user = df_c_user[df_c_user[col_mes_c].isin(f_mes_c)]
+                df_c_user = df_c_user[df_c_user[col_c_mes].isin(f_mes_c)]
 
-        # Filtro de Búsqueda de Cuenta Contable por Nombre
-        if col_cuenta_c and col_cuenta_c in df_c_user.columns:
-            cuentas_c_disp = sorted(df_c_user[col_cuenta_c].dropna().astype(str).unique())
-            f_cta_c = st.sidebar.multiselect("🔎 Filtrar Nombre de Cuenta Contable:", cuentas_c_disp, default=[])
-            if f_cta_c:
-                df_c_user = df_c_user[df_c_user[col_cuenta_c].astype(str).isin(f_cta_c)]
+        # Filtro por NOMBRE DE CUENTA (Sin números)
+        if col_nombre_mostrar and col_nombre_mostrar in df_c_user.columns:
+            nombres_cuentas_unicas = sorted(
+                [str(c).strip() for c in df_c_user[col_nombre_mostrar].dropna().unique() if str(c).strip() != '-' and str(c).strip() != 'nan']
+            )
+            f_cta_nom_c = st.sidebar.multiselect("🔎 Filtrar Nombre de Cuenta Contable:", nombres_cuentas_unicas, default=[])
+            if f_cta_nom_c:
+                df_c_user = df_c_user[df_c_user[col_nombre_mostrar].astype(str).str.strip().isin(f_cta_nom_c)]
 
-        # Métricas
+        # ---------------------------------------------------------
+        # 4. MÉTRICAS Y GRÁFICOS
+        # ---------------------------------------------------------
         compras_totales = len(df_c_user)
-        monto_total_c = abs(pd.to_numeric(df_c_user[col_monto_c], errors='coerce').sum()) if col_monto_c else 0
-        compra_maxima = abs(pd.to_numeric(df_c_user[col_monto_c], errors='coerce').max()) if col_monto_c and not df_c_user.empty else 0
+        monto_total_c = abs(pd.to_numeric(df_c_user[col_c_monto], errors='coerce').sum()) if col_c_monto else 0
+        promedio_compra = (monto_total_c / compras_totales) if compras_totales > 0 else 0
 
         kc1, kc2, kc3 = st.columns(3)
         with kc1:
-            st.markdown(f'<div class="custom-card"><div class="card-title">Monto Total de Compras</div><div class="card-value">{formato_moneda(monto_total_c, con_decimales=True)}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="custom-card"><div class="card-title">Monto Total Compras</div><div class="card-value">{formato_moneda(monto_total_c)}</div></div>', unsafe_allow_html=True)
         with kc2:
-            st.markdown(f'<div class="custom-card"><div class="card-title">Operaciones de Compra</div><div class="card-value">{compras_totales:,}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="custom-card"><div class="card-title">Cantidad de Registros</div><div class="card-value">{compras_totales:,}</div></div>', unsafe_allow_html=True)
         with kc3:
-            st.markdown(f'<div class="custom-card"><div class="card-title">Mayor Compra Registrada</div><div class="card-value">{formato_moneda(compra_maxima, con_decimales=True)}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="custom-card"><div class="card-title">Promedio por Registro</div><div class="card-value">{formato_moneda(promedio_compra)}</div></div>', unsafe_allow_html=True)
 
-        # Gráficos
         col_cg1, col_cg2 = st.columns([1.3, 1])
         with col_cg1:
-            st.markdown('<div class="chart-box-title">📅 Evolución de Compras Mensuales</div>', unsafe_allow_html=True)
-            if col_mes_c and col_monto_c and col_mes_c in df_c_user.columns:
-                df_c_user[col_monto_c] = pd.to_numeric(df_c_user[col_monto_c], errors='coerce').fillna(0)
-                g_mes_c = df_c_user.groupby(col_mes_c)[col_monto_c].apply(lambda x: abs(x.sum())).reset_index()
-                fig_mc = px.bar(g_mes_c, x=col_mes_c, y=col_monto_c, color_discrete_sequence=['#E61C24'])
+            st.markdown('<div class="chart-box-title">📅 Evolución Mensual de Compras</div>', unsafe_allow_html=True)
+            if col_c_mes and col_c_monto and col_c_mes in df_c_user.columns:
+                df_c_user[col_c_monto] = pd.to_numeric(df_c_user[col_c_monto], errors='coerce').fillna(0)
+                g_mes_c = df_c_user.groupby(col_c_mes)[col_c_monto].apply(lambda x: abs(x.sum())).reset_index()
+                fig_mc = px.bar(g_mes_c, x=col_c_mes, y=col_c_monto, color_discrete_sequence=['#E61C24'])
                 fig_mc.update_layout(
                     autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
                     xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
@@ -910,25 +988,39 @@ elif modulo_seleccionado == "🛒 Compras":
                 st.plotly_chart(fig_mc, use_container_width=True, config=PLOTLY_CONFIG)
 
         with col_cg2:
-            st.markdown('<div class="chart-box-title">🏢 Top Proveedores</div>', unsafe_allow_html=True)
-            if col_prov_c and col_monto_c:
-                df_c_user[col_monto_c] = pd.to_numeric(df_c_user[col_monto_c], errors='coerce').fillna(0)
-                g_prov_c = df_c_user.groupby(col_prov_c)[col_monto_c].apply(lambda x: abs(x.sum())).reset_index().sort_values(by=col_monto_c, ascending=True).tail(5)
-                fig_pc = px.bar(g_prov_c, x=col_monto_c, y=col_prov_c, orientation='h', color_discrete_sequence=['#9CA3AF'])
-                fig_pc.update_layout(
-                    autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
-                    xaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
-                    yaxis=dict(gridcolor='#374151', tickfont=dict(color='#FFFFFF'), automargin=True),
-                    height=300, margin=dict(l=15, r=15, t=15, b=15), xaxis_title="", yaxis_title=""
+            st.markdown('<div class="chart-box-title">📊 Distribución por Nombre de Cuenta</div>', unsafe_allow_html=True)
+            if col_nombre_mostrar and col_c_monto and col_nombre_mostrar in df_c_user.columns:
+                df_c_user[col_c_monto] = pd.to_numeric(df_c_user[col_c_monto], errors='coerce').fillna(0)
+                
+                # Agrupar por NOMBRE DE CUENTA
+                g_cta_c = df_c_user.groupby(col_nombre_mostrar)[col_c_monto].apply(lambda x: abs(x.sum())).reset_index()
+                g_cta_c = g_cta_c.sort_values(by=col_c_monto, ascending=False).head(5)
+                
+                fig_cc = px.pie(
+                    g_cta_c, 
+                    values=col_c_monto, 
+                    names=col_nombre_mostrar, 
+                    hole=0.3, 
+                    color_discrete_sequence=['#E61C24', '#9CA3AF', '#6B7280', '#374151', '#D1D5DB']
                 )
-                st.plotly_chart(fig_pc, use_container_width=True, config=PLOTLY_CONFIG)
+                fig_cc.update_traces(textposition='inside', textinfo='percent+label')
+                fig_cc.update_layout(
+                    autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
+                    height=300, margin=dict(l=15, r=15, t=15, b=15)
+                )
+                st.plotly_chart(fig_cc, use_container_width=True, config=PLOTLY_CONFIG)
 
-        # Tabla de Compras
+        # ---------------------------------------------------------
+        # 5. TABLA GENERAL
+        # ---------------------------------------------------------
         st.markdown("---")
-        st.markdown("### 🛍️ Listado General de Compras")
+        st.markdown("### 📋 Registro Detallado de Compras")
 
-        search_c = st.text_input("🔎 Buscar por Nombre de Cuenta Contable, Proveedor o Artículos:", "")
-        df_c_render = df_c_user.copy()
+        search_c = st.text_input("🔎 Buscar por Nombre de Cuenta, Proveedor o Detalles:", "")
+        
+        # Ocultar columnas internas auxiliares del cruce
+        cols_ocultar_c = ['KEY_CTA', 'RESPONSABLE_MAP']
+        df_c_render = df_c_user.drop(columns=[c for c in cols_ocultar_c if c in df_c_user.columns]).copy()
 
         if search_c:
             mask_c = df_c_render.astype(str).apply(lambda x: x.str.lower().str.contains(search_c.lower())).any(axis=1)
