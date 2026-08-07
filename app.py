@@ -316,12 +316,19 @@ def cargar_datos_multihoja(file):
 
     # 1. Hoja Principal (Presupuesto y Gastos)
     df_main = pd.read_excel(xls, sheet_name=hojas[0])
+    df_main.columns = [str(c).strip() for c in df_main.columns]
+    
     if 'MES' in df_main.columns:
         df_main['MES_DT'] = pd.to_datetime(df_main['MES'], errors='coerce')
         df_main['MES_NOMBRE'] = df_main['MES_DT'].dt.strftime('%Y-%m')
     for c in ['INTERNO', 'DES1', 'DES2', 'TEXTO INTERNO', 'DESC CTA CBLE', 'RAZON', 'COMPROBANTE']:
         if c in df_main.columns:
             df_main[c] = df_main[c].fillna('-')
+
+    # Normalizar columna de cuenta contable
+    col_cta_m = obtener_columna(df_main, ['CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'DESC CTA CBLE', 'CTA_CBLE'])
+    if col_cta_m:
+        df_main['CUENTA_NORMALIZADA'] = df_main[col_cta_m].astype(str).str.strip()
 
     # 2. Hoja Vales de Consumo
     df_vales = pd.DataFrame()
@@ -332,10 +339,15 @@ def cargar_datos_multihoja(file):
         df_vales = pd.read_excel(xls, sheet_name=hojas[1])
 
     if not df_vales.empty:
-        col_fecha_v = obtener_columna(df_vales, ['FECHA', 'MES'])
+        df_vales.columns = [str(c).strip() for c in df_vales.columns]
+        col_fecha_v = obtener_columna(df_vales, ['FECHA', 'MES', 'FEC CMPTE', 'FEC OP'])
         if col_fecha_v:
             df_vales['MES_DT'] = pd.to_datetime(df_vales[col_fecha_v], errors='coerce')
             df_vales['MES_NOMBRE'] = df_vales['MES_DT'].dt.strftime('%Y-%m')
+            
+        col_cta_v = obtener_columna(df_vales, ['DESC CTA CBLE', 'CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'CONCEPTO', 'CATEGORIA'])
+        if col_cta_v:
+            df_vales['CUENTA_NORMALIZADA'] = df_vales[col_cta_v].astype(str).str.strip()
 
     # 3. Hoja Compras
     df_compras = pd.DataFrame()
@@ -346,10 +358,15 @@ def cargar_datos_multihoja(file):
         df_compras = pd.read_excel(xls, sheet_name=hojas[2])
 
     if not df_compras.empty:
-        col_fecha_c = obtener_columna(df_compras, ['FECHA', 'MES'])
+        df_compras.columns = [str(c).strip() for c in df_compras.columns]
+        col_fecha_c = obtener_columna(df_compras, ['FECHA', 'MES', 'FEC CMPTE', 'FEC OP'])
         if col_fecha_c:
             df_compras['MES_DT'] = pd.to_datetime(df_compras[col_fecha_c], errors='coerce')
             df_compras['MES_NOMBRE'] = df_compras['MES_DT'].dt.strftime('%Y-%m')
+
+        col_cta_c = obtener_columna(df_compras, ['DESC CTA CBLE', 'CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'CONCEPTO'])
+        if col_cta_c:
+            df_compras['CUENTA_NORMALIZADA'] = df_compras[col_cta_c].astype(str).str.strip()
 
     return {'main': df_main, 'vales': df_vales, 'compras': df_compras}
 
@@ -359,6 +376,20 @@ def obtener_base_inicial():
         return cargar_datos_multihoja("Base Dashboard.xlsx")
     except Exception:
         return None
+
+def obtener_cuentas_de_responsables(df_main, lista_responsables):
+    """Devuelve el conjunto de cuentas contables (serie 6) asignadas a los responsables indicados"""
+    if df_main.empty or 'RESPONSABLE' not in df_main.columns:
+        return set()
+    
+    resps_upper = [str(r).upper() for r in lista_responsables]
+    mask_resp = df_main['RESPONSABLE'].astype(str).str.upper().isin(resps_upper)
+    
+    col_cta_name = 'DESC CTA CBLE' if 'DESC CTA CBLE' in df_main.columns else 'CUENTA_NORMALIZADA'
+    if col_cta_name in df_main.columns:
+        cuentas = df_main[mask_resp][col_cta_name].dropna().unique()
+        return set([str(c).strip() for c in cuentas])
+    return set()
 
 # Estado de sesión
 if 'logged_in' not in st.session_state:
@@ -388,7 +419,7 @@ if not st.session_state['logged_in']:
             st.markdown('<div class="login-title">Reginald Lee S.A.</div>', unsafe_allow_html=True)
             st.markdown('<div class="login-subtitle">Plataforma de Control Presupuestario</div>', unsafe_allow_html=True)
             
-            user_input = st.text_input("Usuario (Responsable)", placeholder="Ej: galdeman o admin").strip()
+            user_input = st.text_input("Usuario (Responsable)", placeholder="Ej: amores o admin").strip()
             pass_input = st.text_input("Contraseña", type="password").strip()
             submit_login = st.form_submit_button("🔑 Ingresar al Dashboard")
             
@@ -662,38 +693,70 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
         </div>
     """, unsafe_allow_html=True)
 
+    df_main = data_dict['main'] if data_dict else pd.DataFrame()
     df_vales = data_dict['vales'] if data_dict else pd.DataFrame()
 
     if df_vales.empty:
         st.info("ℹ️ No se encontraron datos en la pestaña de 'Vales de Consumo'. Asegúrese de agregar la hoja al Excel.")
     else:
-        col_resp_v = obtener_columna(df_vales, ['RESPONSABLE', 'USUARIO', 'SOLICITANTE'])
-        col_monto_v = obtener_columna(df_vales, ['MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'VALOR'])
-        col_cuenta_v = obtener_columna(df_vales, ['CUENTA', 'GRUPO DE CUENTAS', 'DESC CTA CBLE', 'CONCEPTO', 'CATEGORIA'])
+        col_monto_v = obtener_columna(df_vales, ['MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'VALOR', 'PRECIO TOTAL', 'NETO_TOTAL_FACTURA'])
+        col_cuenta_v = obtener_columna(df_vales, ['DESC CTA CBLE', 'CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'CONCEPTO', 'CATEGORIA', 'GRUPO DE CUENTAS'])
         col_mes_v = 'MES_NOMBRE' if 'MES_NOMBRE' in df_vales.columns else obtener_columna(df_vales, ['MES', 'FECHA'])
+        col_resp_directo = obtener_columna(df_vales, ['RESPONSABLE', 'USUARIO', 'SOLICITANTE'])
 
-        # Filtrar por Usuario Logueado / Admin
-        if col_resp_v and not st.session_state['is_admin']:
-            df_v_user = df_vales[df_vales[col_resp_v].astype(str).str.upper() == st.session_state['user']]
+        # Filtrado de cuentas asociadas según perfil de usuario
+        if not st.session_state['is_admin']:
+            resps_activos = [st.session_state['user']]
+            cuentas_permitidas = obtener_cuentas_de_responsables(df_main, resps_activos)
+            
+            if col_resp_directo and col_resp_directo in df_vales.columns:
+                mask_user = (df_vales[col_resp_directo].astype(str).str.upper() == st.session_state['user'])
+                if col_cuenta_v:
+                    mask_user = mask_user | (df_vales[col_cuenta_v].astype(str).str.strip().isin(cuentas_permitidas))
+                df_v_user = df_vales[mask_user].copy()
+            elif col_cuenta_v:
+                df_v_user = df_vales[df_vales[col_cuenta_v].astype(str).str.strip().isin(cuentas_permitidas)].copy()
+            else:
+                df_v_user = df_vales.copy()
         else:
-            df_v_user = df_vales.copy()
+            # Vista Administrador
+            st.sidebar.subheader("🎯 Filtros Administrador")
+            resps_disp = sorted(df_main['RESPONSABLE'].dropna().unique()) if not df_main.empty else []
+            f_resp_v = st.sidebar.multiselect("Filtrar por Responsables:", resps_disp, default=resps_disp)
+            
+            if f_resp_v:
+                cuentas_permitidas = obtener_cuentas_de_responsables(df_main, f_resp_v)
+                if col_resp_directo and col_resp_directo in df_vales.columns:
+                    mask_a = df_vales[col_resp_directo].astype(str).str.upper().isin([r.upper() for r in f_resp_v])
+                    if col_cuenta_v:
+                        mask_a = mask_a | df_vales[col_cuenta_v].astype(str).str.strip().isin(cuentas_permitidas)
+                    df_v_user = df_vales[mask_a].copy()
+                elif col_cuenta_v:
+                    df_v_user = df_vales[df_vales[col_cuenta_v].astype(str).str.strip().isin(cuentas_permitidas)].copy()
+                else:
+                    df_v_user = df_vales.copy()
+            else:
+                df_v_user = df_vales.copy()
 
-        # Filtros Sidebar
+        # Filtros Adicionales en Sidebar
         st.sidebar.subheader("🎯 Filtros Vales de Consumo")
         
         if col_mes_v and col_mes_v in df_v_user.columns:
             meses_v = sorted(df_v_user[col_mes_v].dropna().unique())
             f_mes_v = st.sidebar.multiselect("Filtrar Mes:", meses_v, default=meses_v)
-            df_v_user = df_v_user[df_v_user[col_mes_v].isin(f_mes_v)]
+            if f_mes_v:
+                df_v_user = df_v_user[df_v_user[col_mes_v].isin(f_mes_v)]
 
-        if col_resp_v and st.session_state['is_admin']:
-            resps_v = sorted(df_v_user[col_resp_v].dropna().unique())
-            f_resp_v = st.sidebar.multiselect("Filtrar Responsable:", resps_v, default=resps_v)
-            df_v_user = df_v_user[df_v_user[col_resp_v].isin(f_resp_v)]
+        # Filtro de Búsqueda de Cuenta Contable por Nombre
+        if col_cuenta_v and col_cuenta_v in df_v_user.columns:
+            cuentas_v_disp = sorted(df_v_user[col_cuenta_v].dropna().astype(str).unique())
+            f_cta_v = st.sidebar.multiselect("🔎 Filtrar Nombre de Cuenta Contable:", cuentas_v_disp, default=[])
+            if f_cta_v:
+                df_v_user = df_v_user[df_v_user[col_cuenta_v].astype(str).isin(f_cta_v)]
 
         # Métricas principales
         vales_totales = len(df_v_user)
-        monto_total_v = abs(df_v_user[col_monto_v].sum()) if col_monto_v else 0
+        monto_total_v = abs(pd.to_numeric(df_v_user[col_monto_v], errors='coerce').sum()) if col_monto_v else 0
         promedio_vale = (monto_total_v / vales_totales) if vales_totales > 0 else 0
 
         kv1, kv2, kv3 = st.columns(3)
@@ -709,6 +772,7 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
         with col_vg1:
             st.markdown('<div class="chart-box-title">📅 Evolución Mensual de Consumos</div>', unsafe_allow_html=True)
             if col_mes_v and col_monto_v and col_mes_v in df_v_user.columns:
+                df_v_user[col_monto_v] = pd.to_numeric(df_v_user[col_monto_v], errors='coerce').fillna(0)
                 g_mes_v = df_v_user.groupby(col_mes_v)[col_monto_v].apply(lambda x: abs(x.sum())).reset_index()
                 fig_mv = px.bar(g_mes_v, x=col_mes_v, y=col_monto_v, color_discrete_sequence=['#E61C24'])
                 fig_mv.update_layout(
@@ -722,8 +786,9 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
         with col_vg2:
             st.markdown('<div class="chart-box-title">📊 Distribución por Cuenta / Concepto</div>', unsafe_allow_html=True)
             if col_cuenta_v and col_monto_v:
-                g_cta_v = df_v_user.groupby(col_cuenta_v)[col_monto_v].apply(lambda x: abs(x.sum())).reset_index()
-                fig_cv = px.pie(g_cta_v, values=col_monto_v, names=col_cuenta_v, hole=0.3, color_discrete_sequence=['#E61C24', '#9CA3AF', '#6B7280', '#374151'])
+                df_v_user[col_monto_v] = pd.to_numeric(df_v_user[col_monto_v], errors='coerce').fillna(0)
+                g_cta_v = df_v_user.groupby(col_cuenta_v)[col_monto_v].apply(lambda x: abs(x.sum())).reset_index().sort_values(by=col_monto_v, ascending=False).head(5)
+                fig_cv = px.pie(g_cta_v, values=col_monto_v, names=col_cuenta_v, hole=0.3, color_discrete_sequence=['#E61C24', '#9CA3AF', '#6B7280', '#374151', '#D1D5DB'])
                 fig_cv.update_traces(textposition='inside', textinfo='percent+label')
                 fig_cv.update_layout(
                     autosize=True, paper_bgcolor='#1F2937', plot_bgcolor='#1F2937', font=dict(color='#FFFFFF'),
@@ -735,7 +800,7 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
         st.markdown("---")
         st.markdown("### 📋 Registro Detallado de Vales de Consumo")
 
-        search_v = st.text_input("🔎 Buscar en Vales de Consumo:", "")
+        search_v = st.text_input("🔎 Buscar por Nombre de Cuenta, Artículos o Detalles:", "")
         df_v_render = df_v_user.copy()
 
         if search_v:
@@ -755,21 +820,51 @@ elif modulo_seleccionado == "🛒 Compras":
         </div>
     """, unsafe_allow_html=True)
 
+    df_main = data_dict['main'] if data_dict else pd.DataFrame()
     df_compras = data_dict['compras'] if data_dict else pd.DataFrame()
 
     if df_compras.empty:
         st.info("ℹ️ No se encontraron datos en la pestaña de 'Compras'. Asegúrese de agregar la hoja al Excel.")
     else:
+        col_monto_c = obtener_columna(df_compras, ['NETO_TOTAL_FACTURA', 'MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'PRECIO TOTAL'])
+        col_prov_c = obtener_columna(df_compras, ['RAZ_SOCIAL', 'PROVEEDOR', 'RAZON SOCIAL', 'DES1', 'ENTIDAD'])
+        col_cuenta_c = obtener_columna(df_compras, ['DESC CTA CBLE', 'CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'CONCEPTO'])
+        col_mes_c = 'MES_NOMBRE' if 'MES_NOMBRE' in df_compras.columns else obtener_columna(df_compras, ['Fec Cmpte', 'MES', 'FECHA'])
         col_resp_c = obtener_columna(df_compras, ['RESPONSABLE', 'USUARIO', 'SOLICITANTE', 'COMPRADOR'])
-        col_monto_c = obtener_columna(df_compras, ['MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'PRECIO TOTAL'])
-        col_prov_c = obtener_columna(df_compras, ['PROVEEDOR', 'RAZON SOCIAL', 'DES1', 'ENTIDAD'])
-        col_mes_c = 'MES_NOMBRE' if 'MES_NOMBRE' in df_compras.columns else obtener_columna(df_compras, ['MES', 'FECHA'])
 
-        # Filtrar por Usuario Logueado / Admin
-        if col_resp_c and not st.session_state['is_admin']:
-            df_c_user = df_compras[df_compras[col_resp_c].astype(str).str.upper() == st.session_state['user']]
+        # Filtrado de cuentas asociadas según responsable
+        if not st.session_state['is_admin']:
+            resps_activos = [st.session_state['user']]
+            cuentas_permitidas = obtener_cuentas_de_responsables(df_main, resps_activos)
+            
+            if col_resp_c and col_resp_c in df_compras.columns:
+                mask_user_c = (df_compras[col_resp_c].astype(str).str.upper() == st.session_state['user'])
+                if col_cuenta_c:
+                    mask_user_c = mask_user_c | (df_compras[col_cuenta_c].astype(str).str.strip().isin(cuentas_permitidas))
+                df_c_user = df_compras[mask_user_c].copy()
+            elif col_cuenta_c:
+                df_c_user = df_compras[df_compras[col_cuenta_c].astype(str).str.strip().isin(cuentas_permitidas)].copy()
+            else:
+                df_c_user = df_compras.copy()
         else:
-            df_c_user = df_compras.copy()
+            # Vista Administrador
+            st.sidebar.subheader("🎯 Filtros Administrador")
+            resps_disp = sorted(df_main['RESPONSABLE'].dropna().unique()) if not df_main.empty else []
+            f_resp_c = st.sidebar.multiselect("Filtrar por Responsables:", resps_disp, default=resps_disp)
+            
+            if f_resp_c:
+                cuentas_permitidas = obtener_cuentas_de_responsables(df_main, f_resp_c)
+                if col_resp_c and col_resp_c in df_compras.columns:
+                    mask_ac = df_compras[col_resp_c].astype(str).str.upper().isin([r.upper() for r in f_resp_c])
+                    if col_cuenta_c:
+                        mask_ac = mask_ac | df_compras[col_cuenta_c].astype(str).str.strip().isin(cuentas_permitidas)
+                    df_c_user = df_compras[mask_ac].copy()
+                elif col_cuenta_c:
+                    df_c_user = df_compras[df_compras[col_cuenta_c].astype(str).str.strip().isin(cuentas_permitidas)].copy()
+                else:
+                    df_c_user = df_compras.copy()
+            else:
+                df_c_user = df_compras.copy()
 
         # Filtros Sidebar
         st.sidebar.subheader("🎯 Filtros de Compras")
@@ -777,31 +872,35 @@ elif modulo_seleccionado == "🛒 Compras":
         if col_mes_c and col_mes_c in df_c_user.columns:
             meses_c = sorted(df_c_user[col_mes_c].dropna().unique())
             f_mes_c = st.sidebar.multiselect("Filtrar Mes:", meses_c, default=meses_c)
-            df_c_user = df_c_user[df_c_user[col_mes_c].isin(f_mes_c)]
+            if f_mes_c:
+                df_c_user = df_c_user[df_c_user[col_mes_c].isin(f_mes_c)]
 
-        if col_resp_c and st.session_state['is_admin']:
-            resps_c = sorted(df_c_user[col_resp_c].dropna().unique())
-            f_resp_c = st.sidebar.multiselect("Filtrar Responsable:", resps_c, default=resps_c)
-            df_c_user = df_c_user[df_c_user[col_resp_c].isin(f_resp_c)]
+        # Filtro de Búsqueda de Cuenta Contable por Nombre
+        if col_cuenta_c and col_cuenta_c in df_c_user.columns:
+            cuentas_c_disp = sorted(df_c_user[col_cuenta_c].dropna().astype(str).unique())
+            f_cta_c = st.sidebar.multiselect("🔎 Filtrar Nombre de Cuenta Contable:", cuentas_c_disp, default=[])
+            if f_cta_c:
+                df_c_user = df_c_user[df_c_user[col_cuenta_c].astype(str).isin(f_cta_c)]
 
         # Métricas
         compras_totales = len(df_c_user)
-        monto_total_c = abs(df_c_user[col_monto_c].sum()) if col_monto_c else 0
-        compra_maxima = abs(df_c_user[col_monto_c].max()) if col_monto_c and not df_c_user.empty else 0
+        monto_total_c = abs(pd.to_numeric(df_c_user[col_monto_c], errors='coerce').sum()) if col_monto_c else 0
+        compra_maxima = abs(pd.to_numeric(df_c_user[col_monto_c], errors='coerce').max()) if col_monto_c and not df_c_user.empty else 0
 
         kc1, kc2, kc3 = st.columns(3)
         with kc1:
-            st.markdown(f'<div class="custom-card"><div class="card-title">Monto Total de Compras</div><div class="card-value">{formato_moneda(monto_total_c)}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="custom-card"><div class="card-title">Monto Total de Compras</div><div class="card-value">{formato_moneda(monto_total_c, con_decimales=True)}</div></div>', unsafe_allow_html=True)
         with kc2:
             st.markdown(f'<div class="custom-card"><div class="card-title">Operaciones de Compra</div><div class="card-value">{compras_totales:,}</div></div>', unsafe_allow_html=True)
         with kc3:
-            st.markdown(f'<div class="custom-card"><div class="card-title">Mayor Compra Registrada</div><div class="card-value">{formato_moneda(compra_maxima)}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="custom-card"><div class="card-title">Mayor Compra Registrada</div><div class="card-value">{formato_moneda(compra_maxima, con_decimales=True)}</div></div>', unsafe_allow_html=True)
 
         # Gráficos
         col_cg1, col_cg2 = st.columns([1.3, 1])
         with col_cg1:
             st.markdown('<div class="chart-box-title">📅 Evolución de Compras Mensuales</div>', unsafe_allow_html=True)
             if col_mes_c and col_monto_c and col_mes_c in df_c_user.columns:
+                df_c_user[col_monto_c] = pd.to_numeric(df_c_user[col_monto_c], errors='coerce').fillna(0)
                 g_mes_c = df_c_user.groupby(col_mes_c)[col_monto_c].apply(lambda x: abs(x.sum())).reset_index()
                 fig_mc = px.bar(g_mes_c, x=col_mes_c, y=col_monto_c, color_discrete_sequence=['#E61C24'])
                 fig_mc.update_layout(
@@ -815,6 +914,7 @@ elif modulo_seleccionado == "🛒 Compras":
         with col_cg2:
             st.markdown('<div class="chart-box-title">🏢 Top Proveedores</div>', unsafe_allow_html=True)
             if col_prov_c and col_monto_c:
+                df_c_user[col_monto_c] = pd.to_numeric(df_c_user[col_monto_c], errors='coerce').fillna(0)
                 g_prov_c = df_c_user.groupby(col_prov_c)[col_monto_c].apply(lambda x: abs(x.sum())).reset_index().sort_values(by=col_monto_c, ascending=True).tail(5)
                 fig_pc = px.bar(g_prov_c, x=col_monto_c, y=col_prov_c, orientation='h', color_discrete_sequence=['#9CA3AF'])
                 fig_pc.update_layout(
@@ -829,7 +929,7 @@ elif modulo_seleccionado == "🛒 Compras":
         st.markdown("---")
         st.markdown("### 🛍️ Listado General de Compras")
 
-        search_c = st.text_input("🔎 Buscar en Compras:", "")
+        search_c = st.text_input("🔎 Buscar por Nombre de Cuenta Contable, Proveedor o Artículos:", "")
         df_c_render = df_c_user.copy()
 
         if search_c:
