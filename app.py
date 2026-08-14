@@ -4,6 +4,19 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # ---------------------------------------------------------
+# FUNCIÓN PARA BORRAR FILTROS
+# ---------------------------------------------------------
+def limpiar_filtros():
+    keys_filtros = [
+        'f_resp_main', 'f_mes_main', 'f_cta_nom_main', 'search_main',
+        'f_resp_v', 'f_mes_v', 'f_cta_nom_v', 'search_v',
+        'f_resp_c', 'f_mes_c', 'f_cta_nom_c', 'search_c'
+    ]
+    for key in keys_filtros:
+        if key in st.session_state:
+            del st.session_state[key]
+
+# ---------------------------------------------------------
 # CONFIGURACIÓN DE PÁGINA
 # ---------------------------------------------------------
 st.set_page_config(
@@ -486,7 +499,10 @@ modulo_seleccionado = st.sidebar.radio(
     ["📊 Presupuesto y Gastos", "🎟️ Vales de Consumo", "🛒 Compras"],
     index=0
 )
-
+st.sidebar.markdown("---")
+if st.sidebar.button("🧹 Limpiar Todos los Filtros", use_container_width=True):
+    limpiar_filtros()
+    st.rerun()
 # ---------------------------------------------------------
 # MÓDULO 1: PRESUPUESTO Y GASTOS
 # ---------------------------------------------------------
@@ -511,13 +527,13 @@ if modulo_seleccionado == "📊 Presupuesto y Gastos":
         locs_disp = sorted(df_user['LOCACION'].dropna().unique())
         grupos_disp = sorted(df_user['GRUPO DE CUENTAS'].dropna().unique())
 
-        f_mes = st.sidebar.multiselect("Meses", meses_disp, default=meses_disp)
-        f_loc = st.sidebar.multiselect("Locación / Planta", locs_disp, default=locs_disp)
-        f_grupo = st.sidebar.multiselect("Grupo de Cuentas", grupos_disp, default=grupos_disp)
+        f_mes = st.sidebar.multiselect("Meses", meses_disp, default=meses_disp, key="f_mes_main")
+        f_loc = st.sidebar.multiselect("Locación / Planta", locs_disp, default=locs_disp, key="f_loc_main")
+        f_grupo = st.sidebar.multiselect("Grupo de Cuentas", grupos_disp, default=grupos_disp, key="f_grupo_main")
 
         if st.session_state['is_admin']:
             resps_disp = sorted(df_user['RESPONSABLE'].dropna().unique())
-            f_resp = st.sidebar.multiselect("Responsable Sector", resps_disp, default=resps_disp)
+            f_resp = st.sidebar.multiselect("Responsable Sector", resps_disp, default=resps_disp, key="f_resp_main")
         else:
             f_resp = [st.session_state['user']]
 
@@ -641,7 +657,7 @@ if modulo_seleccionado == "📊 Presupuesto y Gastos":
         with col_f1:
             f_cuentas_tabla = st.multiselect("🔎 Filtrar por Cuenta Contable:", cuentas_unicas, default=[])
         with col_f2:
-            search_kw = st.text_input("💬 Buscar por Proveedor / N° Interno:", "")
+            search_kw = st.text_input("💬 Buscar por Proveedor / N° Interno:", "", key="search_kw_main")
 
         if f_cuentas_tabla:
             df_auditoria = df_auditoria[df_auditoria['DESC CTA CBLE'].isin(f_cuentas_tabla)]
@@ -757,7 +773,7 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
         else:
             st.sidebar.subheader("🎯 Filtros Administrador")
             resps_disp = sorted(df_main['RESPONSABLE'].dropna().unique()) if not df_main.empty else []
-            f_resp_v = st.sidebar.multiselect("Filtrar por Responsables:", resps_disp, default=resps_disp)
+            f_resp_v = st.sidebar.multiselect("Filtrar por Responsables:", resps_disp, default=resps_disp, key="f_resp_v_main")
             
             if f_resp_v and col_resp_cruce in df_v_trabajo.columns:
                 resps_upper = [r.upper() for r in f_resp_v]
@@ -773,7 +789,7 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
         # Filtro por Mes
         if col_v_mes and col_v_mes in df_v_user.columns:
             meses_v = sorted(df_v_user[col_v_mes].dropna().unique())
-            f_mes_v = st.sidebar.multiselect("Filtrar Mes:", meses_v, default=meses_v)
+            f_mes_v = st.sidebar.multiselect("Filtrar Mes:", meses_v, default=meses_v, key="f_mes_v_main")
             if f_mes_v:
                 df_v_user = df_v_user[df_v_user[col_v_mes].isin(f_mes_v)]
 
@@ -782,7 +798,7 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
             nombres_cuentas_unicas = sorted(
                 [str(c).strip() for c in df_v_user[col_nombre_mostrar].dropna().unique() if str(c).strip() != '-' and str(c).strip() != 'nan']
             )
-            f_cta_nom = st.sidebar.multiselect("🔎 Filtrar Nombre de Cuenta Contable:", nombres_cuentas_unicas, default=[])
+            f_cta_nom = st.sidebar.multiselect("🔎 Filtrar Nombre de Cuenta Contable:", nombres_cuentas_unicas, default=[], key="f_cta_nom_main")
             if f_cta_nom:
                 df_v_user = df_v_user[df_v_user[col_nombre_mostrar].astype(str).str.strip().isin(f_cta_nom)]
 
@@ -882,7 +898,7 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
         st.markdown("---")
         st.markdown("### 📋 Registro Detallado de Vales de Consumo")
 
-        search_v = st.text_input("🔎 Buscar por Nombre de Cuenta, Artículos o Detalles:", "")
+        search_v = st.text_input("🔎 Buscar por Nombre de Cuenta, Artículos o Detalles:", "", key="search_v_main")
         
         # Ocultar columnas internas auxiliares usadas para el cruce
         cols_ocultar = ['KEY_CTA', 'RESPONSABLE_MAP']
@@ -961,7 +977,7 @@ elif modulo_seleccionado == "🛒 Compras":
         else:
             st.sidebar.subheader("🎯 Filtros Administrador")
             resps_disp = sorted(df_main['RESPONSABLE'].dropna().unique()) if not df_main.empty else []
-            f_resp_c = st.sidebar.multiselect("Filtrar por Responsables:", resps_disp, default=resps_disp)
+            f_resp_c = st.sidebar.multiselect("Filtrar por Responsables:", resps_disp, default=resps_disp, key="f_resp_c_main")
             
             if f_resp_c and col_resp_cruce in df_c_trabajo.columns:
                 resps_upper = [r.upper() for r in f_resp_c]
@@ -976,7 +992,7 @@ elif modulo_seleccionado == "🛒 Compras":
         
         if col_c_mes and col_c_mes in df_c_user.columns:
             meses_c = sorted(df_c_user[col_c_mes].dropna().unique())
-            f_mes_c = st.sidebar.multiselect("Filtrar Mes:", meses_c, default=meses_c)
+            f_mes_c = st.sidebar.multiselect("Filtrar Mes:", meses_c, default=meses_c, key="f_mes_c_main")
             if f_mes_c:
                 df_c_user = df_c_user[df_c_user[col_c_mes].isin(f_mes_c)]
 
@@ -984,7 +1000,7 @@ elif modulo_seleccionado == "🛒 Compras":
             nombres_cuentas_unicas = sorted(
                 [str(c).strip() for c in df_c_user[col_nombre_mostrar].dropna().unique() if str(c).strip() != '-' and str(c).strip() != 'nan']
             )
-            f_cta_nom_c = st.sidebar.multiselect("🔎 Filtrar Nombre de Cuenta Contable:", nombres_cuentas_unicas, default=[])
+            f_cta_nom_c = st.sidebar.multiselect("🔎 Filtrar Nombre de Cuenta Contable:", nombres_cuentas_unicas, default=[], key="f_cta_nom_c_main")
             if f_cta_nom_c:
                 df_c_user = df_c_user[df_c_user[col_nombre_mostrar].astype(str).str.strip().isin(f_cta_nom_c)]
 
@@ -1090,7 +1106,7 @@ elif modulo_seleccionado == "🛒 Compras":
         st.markdown("---")
         st.markdown("### 📋 Registro Detallado de Compras")
 
-        search_c = st.text_input("🔎 Buscar por Nombre de Cuenta, Proveedor o Detalles:", "")
+        search_c = st.text_input("🔎 Buscar por Nombre de Cuenta, Proveedor o Detalles:", "",key="search_kw_main")
         
         cols_ocultar_c = ['KEY_CTA', 'RESPONSABLE_MAP', 'PROVEEDOR_LABEL']
         df_c_render = df_c_user.drop(columns=[c for c in cols_ocultar_c if c in df_c_user.columns]).copy()
