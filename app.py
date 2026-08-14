@@ -1106,7 +1106,7 @@ elif modulo_seleccionado == "🛒 Compras":
         st.markdown("---")
         st.markdown("### 📋 Registro Detallado de Compras")
 
-        search_c = st.text_input("🔎 Buscar por Nombre de Cuenta, Proveedor o Detalles:", "",key="search_kw_main")
+        search_c = st.text_input("🔎 Buscar por Nombre de Cuenta, Proveedor o Detalles:", "",key="search_c_main")
         
         cols_ocultar_c = ['KEY_CTA', 'RESPONSABLE_MAP', 'PROVEEDOR_LABEL']
         df_c_render = df_c_user.drop(columns=[c for c in cols_ocultar_c if c in df_c_user.columns]).copy()
