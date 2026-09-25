@@ -381,6 +381,63 @@ def obtener_columna_responsable_vales(df):
     return candidatas[0][3]
 
 
+
+def obtener_columna_nombre_cuenta_vales(df):
+    """
+    Devuelve exclusivamente una columna que represente el NOMBRE/DESCRIPCIÓN
+    de la cuenta contable en la hoja Vales de Consumo.
+
+    Evita usar campos genéricos como RUBRO/CATEGORIA/CONCEPTO, porque pueden
+    contener códigos numéricos (por ejemplo 80, 57, 53) que no son el nombre
+    de la cuenta contable. Si hay encabezados duplicados (p.ej. Nombre de Cuenta.1),
+    prioriza la candidata cuyo contenido sea mayormente alfabético.
+    """
+    if df is None or len(df.columns) == 0:
+        return None
+
+    nombres_validos = {
+        "NOMBRE DE CUENTA", "NOMBRE CUENTA", "NOMBRE CTA",
+        "DESC CTA CBLE", "DESCRIPCION CUENTA", "DESCRIPCION DE CUENTA",
+        "DESCRIPCION CTA CBLE", "NOMBRE DE CUENTA CONTABLE",
+        "CUENTA CONTABLE DESCRIPCION"
+    }
+
+    candidatas = []
+    for c in df.columns:
+        nombre = normalizar_nombre_columna(c)
+        base = re.sub(r"\.\d+$", "", nombre).strip()
+        if base not in nombres_validos:
+            continue
+
+        valores = df[c].dropna().astype(str).str.strip()
+        valores = valores[~valores.str.upper().isin(["", "NAN", "NONE", "NULL", "-"])]
+
+        if valores.empty:
+            alpha_ratio = 0.0
+            numeric_ratio = 1.0
+            cantidad = 0
+        else:
+            alpha_ratio = valores.str.contains(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]", regex=True).mean()
+            numeric_ratio = pd.to_numeric(valores, errors="coerce").notna().mean()
+            cantidad = len(valores)
+
+        # Queremos descripciones textuales, no códigos.
+        score = (alpha_ratio * 100.0) - (numeric_ratio * 100.0) + min(cantidad, 1000) / 10000.0
+        candidatas.append((score, alpha_ratio, -numeric_ratio, c))
+
+    if not candidatas:
+        return None
+
+    candidatas.sort(reverse=True, key=lambda x: (x[0], x[1], x[2]))
+    mejor = candidatas[0]
+
+    # Si ni siquiera la mejor candidata contiene texto de forma razonable,
+    # preferimos no usarla y dejar que actúe el mapeo CUENTA -> DESC CTA CBLE.
+    if mejor[1] < 0.50:
+        return None
+
+    return mejor[3]
+
 def convertir_fecha_excel_robusta(serie):
     """
     Convierte fechas reales, textos y seriales de Excel sin transformar números comunes
@@ -879,7 +936,9 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
         col_v_mes = 'MES_NOMBRE' if 'MES_NOMBRE' in df_vales.columns else obtener_columna(df_vales, ['MES', 'FECHA'])
         # IMPORTANTE: el filtro de responsables de Vales sale EXCLUSIVAMENTE de la columna 'Responsable' de esa hoja.
         col_v_resp_directo = obtener_columna_responsable_vales(df_vales)
-        col_v_nombre_directo = obtener_columna(df_vales, ['DESC CTA CBLE', 'NOMBRE CUENTA', 'DESCRIPCION CUENTA', 'CONCEPTO', 'CATEGORIA', 'RUBRO'])
+        # El gráfico/filtro de cuenta debe usar una DESCRIPCIÓN real de cuenta contable.
+        # Nunca usar RUBRO/CATEGORIA/CONCEPTO como sustitutos porque pueden ser códigos numéricos.
+        col_v_nombre_directo = obtener_columna_nombre_cuenta_vales(df_vales)
 
         df_v_trabajo = df_vales.copy()
 
@@ -912,6 +971,15 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
             else pd.Series([None] * len(df_v_trabajo), index=df_v_trabajo.index, dtype="object")
         )
         df_v_trabajo['NOMBRE_CUENTA_FINAL'] = coalesce_texto(nom_directo, nom_map)
+
+        # Limpieza final: una cuenta mostrable debe contener letras. Si el dato directo
+        # fuera un código numérico, se reemplaza por la descripción mapeada desde Main.
+        _nombre_actual = df_v_trabajo['NOMBRE_CUENTA_FINAL'].astype(str).str.strip()
+        _es_codigo = ~_nombre_actual.str.contains(r'[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]', regex=True, na=False)
+        if 'NOMBRE_CUENTA_MAP' in df_v_trabajo.columns:
+            _map_txt = df_v_trabajo['NOMBRE_CUENTA_MAP'].astype('object')
+            _map_valido = _map_txt.notna() & _map_txt.astype(str).str.contains(r'[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]', regex=True, na=False)
+            df_v_trabajo.loc[_es_codigo & _map_valido, 'NOMBRE_CUENTA_FINAL'] = _map_txt.loc[_es_codigo & _map_valido]
 
         col_nombre_mostrar = 'NOMBRE_CUENTA_FINAL'
         col_resp_cruce = 'RESPONSABLE_FINAL'
@@ -996,7 +1064,7 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
             nombres_cuentas_unicas = sorted(
                 [str(c).strip() for c in df_v_user[col_nombre_mostrar].dropna().unique() if str(c).strip() != '-' and str(c).strip() != 'nan']
             )
-            f_cta_nom = st.sidebar.multiselect("🔎 Filtrar Nombre de Cuenta Contable:", nombres_cuentas_unicas, default=[], key="f_cta_nom_main")
+            f_cta_nom = st.sidebar.multiselect("🔎 Filtrar Cuenta Contable:", nombres_cuentas_unicas, default=[], key="f_cta_nom_main")
             if f_cta_nom:
                 df_v_user = df_v_user[df_v_user[col_nombre_mostrar].astype(str).str.strip().isin(f_cta_nom)]
 
@@ -1037,7 +1105,9 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
                 st.info("ℹ️ No se detectó la columna de Artículos o Detalle en la hoja de Vales.")
 
         with col_vg2:
-            st.markdown('<div class="chart-box-title">📊 Distribución por Nombre de Cuenta</div>', unsafe_allow_html=True)
+            st.markdown('<div class="chart-box-title">📊 Distribución por Cuenta Contable</div>', unsafe_allow_html=True)
+            # Este gráfico usa df_v_user, que ya tiene aplicados Responsable + Mes + Cuenta.
+            # Por lo tanto cambia automáticamente cuando cambia el responsable seleccionado.
             if col_nombre_mostrar and col_v_monto and col_nombre_mostrar in df_v_user.columns:
                 df_v_user[col_v_monto] = pd.to_numeric(df_v_user[col_v_monto], errors='coerce').fillna(0)
                 
