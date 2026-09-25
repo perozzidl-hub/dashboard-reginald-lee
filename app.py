@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import re
 
 # ---------------------------------------------------------
 # FUNCIÓN PARA BORRAR FILTROS
@@ -9,8 +10,9 @@ import plotly.graph_objects as go
 def limpiar_filtros():
     keys_filtros = [
         'f_resp_main', 'f_mes_main', 'f_cta_nom_main', 'search_main',
-        'f_resp_v', 'f_mes_v', 'f_cta_nom_v', 'search_v',
-        'f_resp_c', 'f_mes_c', 'f_cta_nom_c', 'search_c'
+        'f_resp_v_main', 'f_mes_v_main', 'f_cta_nom_main', 'search_v_main',
+        'f_resp_c_main', 'f_mes_c_main', 'f_cta_nom_c_main', 'search_c_main',
+        'f_loc_main', 'f_grupo_main', 'search_kw_main'
     ]
     for key in keys_filtros:
         if key in st.session_state:
@@ -321,6 +323,29 @@ def obtener_columna(df, opciones):
             if str(c).strip().upper() == op.upper():
                 return c
     return None
+
+def normalizar_clave_cuenta(valor):
+    """Normaliza IDs de cuenta para evitar fallas de cruce entre Excel (ej. 12345 vs 12345.0)."""
+    if pd.isna(valor):
+        return None
+    s = str(valor).strip().replace('\u00a0', ' ')
+    # Excel suele convertir códigos enteros a float al leerlos
+    if re.fullmatch(r'[-+]?\d+\.0+', s):
+        s = s.split('.')[0]
+    return s.upper()
+
+def valor_texto_valido(valor):
+    if pd.isna(valor):
+        return False
+    s = str(valor).strip()
+    return s not in {"", "-", "NAN", "NONE", "NULL"}
+
+def coalesce_texto(serie_principal, serie_fallback):
+    """Prioriza el valor de la fuente del módulo y usa el mapeo sólo como respaldo."""
+    principal = serie_principal.astype("object").copy()
+    mask_invalida = principal.apply(lambda x: not valor_texto_valido(x))
+    principal.loc[mask_invalida] = serie_fallback.loc[mask_invalida]
+    return principal
 
 @st.cache_data
 def cargar_datos_multihoja(file):
@@ -723,43 +748,67 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
         col_m_nom_cta = obtener_columna(df_main, ['DESC CTA CBLE', 'DESCRIPCION CUENTA', 'NOMBRE CUENTA', 'CUENTA_NORMALIZADA'])
         col_m_resp = 'RESPONSABLE'
 
-        # Construir tabla de mapeo única de Cuentas -> Responsable y Nombre de Cuenta
+        # Mapeo 1:1 por cuenta. Evita merges many-to-many y normaliza códigos numéricos de Excel.
+        mapa_cuentas = pd.DataFrame()
         if col_m_num_cta and col_m_nom_cta and col_m_resp in df_main.columns:
-            mapa_cuentas = df_main[[col_m_num_cta, col_m_nom_cta, col_m_resp]].drop_duplicates().copy()
-            mapa_cuentas[col_m_num_cta] = mapa_cuentas[col_m_num_cta].astype(str).str.strip()
-            mapa_cuentas[col_m_resp] = mapa_cuentas[col_m_resp].astype(str).str.strip().str.upper()
-        else:
-            mapa_cuentas = pd.DataFrame()
+            mapa_base = df_main[[col_m_num_cta, col_m_nom_cta, col_m_resp]].copy()
+            mapa_base['KEY_CTA'] = mapa_base[col_m_num_cta].apply(normalizar_clave_cuenta)
+            mapa_base[col_m_resp] = mapa_base[col_m_resp].astype(str).str.strip().str.upper()
+            mapa_base = mapa_base[mapa_base['KEY_CTA'].notna()].copy()
 
-        # Mapear columna de número de cuenta en la hoja Vales
+            mapa_cuentas = (
+                mapa_base
+                .sort_values(['KEY_CTA'])
+                .drop_duplicates(subset=['KEY_CTA'], keep='first')
+                [['KEY_CTA', col_m_nom_cta, col_m_resp]]
+                .rename(columns={
+                    col_m_nom_cta: 'NOMBRE_CUENTA_MAP',
+                    col_m_resp: 'RESPONSABLE_MAP'
+                })
+            )
+
+        # Detectar columnas de la hoja Vales
         col_v_num_cta = obtener_columna(df_vales, ['CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'NRO CUENTA', 'CODIGO'])
         col_v_monto = obtener_columna(df_vales, ['MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'VALOR', 'PRECIO TOTAL', 'NETO_TOTAL_FACTURA', 'CANTIDAD'])
         col_v_mes = 'MES_NOMBRE' if 'MES_NOMBRE' in df_vales.columns else obtener_columna(df_vales, ['MES', 'FECHA'])
+        col_v_resp_directo = obtener_columna(df_vales, ['RESPONSABLE', 'USUARIO', 'SOLICITANTE', 'RETIRA'])
+        col_v_nombre_directo = obtener_columna(df_vales, ['DESC CTA CBLE', 'NOMBRE CUENTA', 'DESCRIPCION CUENTA', 'CONCEPTO', 'CATEGORIA', 'RUBRO'])
 
         df_v_trabajo = df_vales.copy()
 
-        # Realizar el cruce de datos si existe el número de cuenta en Vales
-        if col_v_num_cta and not mapa_cuentas.empty:
-            df_v_trabajo['KEY_CTA'] = df_v_trabajo[col_v_num_cta].astype(str).str.strip()
-            
-            # Unir con la tabla de mapeo principal por Número de Cuenta
-            df_v_trabajo = df_v_trabajo.merge(
-                mapa_cuentas.rename(columns={
-                    col_m_num_cta: 'KEY_CTA',
-                    col_m_nom_cta: 'NOMBRE_CUENTA_MAP',
-                    col_m_resp: 'RESPONSABLE_MAP'
-                }),
-                on='KEY_CTA',
-                how='left'
-            )
-            
-            # Nombre de la cuenta estandarizado
-            col_nombre_mostrar = 'NOMBRE_CUENTA_MAP'
-            col_resp_cruce = 'RESPONSABLE_MAP'
+        if col_v_num_cta:
+            df_v_trabajo['KEY_CTA'] = df_v_trabajo[col_v_num_cta].apply(normalizar_clave_cuenta)
+            if not mapa_cuentas.empty:
+                df_v_trabajo = df_v_trabajo.merge(mapa_cuentas, on='KEY_CTA', how='left')
+
+        # Responsable final: primero el que ya viene en Vales; si falta, usa el mapeo de la hoja Main.
+        if col_v_resp_directo and col_v_resp_directo in df_v_trabajo.columns:
+            resp_directo = df_v_trabajo[col_v_resp_directo].astype("object")
         else:
-            # Fallback en caso de que no haya columna de número de cuenta
-            col_nombre_mostrar = obtener_columna(df_v_trabajo, ['DESC CTA CBLE', 'CONCEPTO', 'CATEGORIA', 'RUBRO'])
-            col_resp_cruce = obtener_columna(df_v_trabajo, ['RESPONSABLE', 'USUARIO', 'RETIRA'])
+            resp_directo = pd.Series([None] * len(df_v_trabajo), index=df_v_trabajo.index, dtype="object")
+
+        resp_map = (
+            df_v_trabajo['RESPONSABLE_MAP'].astype("object")
+            if 'RESPONSABLE_MAP' in df_v_trabajo.columns
+            else pd.Series([None] * len(df_v_trabajo), index=df_v_trabajo.index, dtype="object")
+        )
+        df_v_trabajo['RESPONSABLE_FINAL'] = coalesce_texto(resp_directo, resp_map).astype(str).str.strip().str.upper()
+
+        # Nombre final de cuenta: prioriza el dato propio de Vales y usa el mapeo como respaldo.
+        if col_v_nombre_directo and col_v_nombre_directo in df_v_trabajo.columns:
+            nom_directo = df_v_trabajo[col_v_nombre_directo].astype("object")
+        else:
+            nom_directo = pd.Series([None] * len(df_v_trabajo), index=df_v_trabajo.index, dtype="object")
+
+        nom_map = (
+            df_v_trabajo['NOMBRE_CUENTA_MAP'].astype("object")
+            if 'NOMBRE_CUENTA_MAP' in df_v_trabajo.columns
+            else pd.Series([None] * len(df_v_trabajo), index=df_v_trabajo.index, dtype="object")
+        )
+        df_v_trabajo['NOMBRE_CUENTA_FINAL'] = coalesce_texto(nom_directo, nom_map)
+
+        col_nombre_mostrar = 'NOMBRE_CUENTA_FINAL'
+        col_resp_cruce = 'RESPONSABLE_FINAL'
 
         # ---------------------------------------------------------
         # 2. FILTRADO POR RESPONSABLE LOGUEADO
@@ -772,12 +821,23 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
                 df_v_user = df_v_trabajo.copy()
         else:
             st.sidebar.subheader("🎯 Filtros Administrador")
-            resps_disp = sorted(df_main['RESPONSABLE'].dropna().unique()) if not df_main.empty else []
-            f_resp_v = st.sidebar.multiselect("Filtrar por Responsables:", resps_disp, default=resps_disp, key="f_resp_v_main")
-            
+            resps_disp = sorted([
+                r for r in df_v_trabajo[col_resp_cruce].dropna().astype(str).str.strip().str.upper().unique()
+                if r not in ('', 'NAN', 'NONE', '-')
+            ]) if col_resp_cruce in df_v_trabajo.columns else []
+
+            f_resp_v = st.sidebar.multiselect(
+                "Filtrar por Responsables:",
+                resps_disp,
+                default=resps_disp,
+                key="f_resp_v_main"
+            )
+
             if f_resp_v and col_resp_cruce in df_v_trabajo.columns:
-                resps_upper = [r.upper() for r in f_resp_v]
-                df_v_user = df_v_trabajo[df_v_trabajo[col_resp_cruce].astype(str).str.upper().isin(resps_upper)].copy()
+                resps_upper = [str(r).strip().upper() for r in f_resp_v]
+                df_v_user = df_v_trabajo[
+                    df_v_trabajo[col_resp_cruce].astype(str).str.strip().str.upper().isin(resps_upper)
+                ].copy()
             else:
                 df_v_user = df_v_trabajo.copy()
 
@@ -901,7 +961,7 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
         search_v = st.text_input("🔎 Buscar por Nombre de Cuenta, Artículos o Detalles:", "", key="search_v_main")
         
         # Ocultar columnas internas auxiliares usadas para el cruce
-        cols_ocultar = ['KEY_CTA', 'RESPONSABLE_MAP']
+        cols_ocultar = ['KEY_CTA', 'RESPONSABLE_MAP', 'RESPONSABLE_FINAL', 'NOMBRE_CUENTA_MAP']
         df_v_render = df_v_user.drop(columns=[c for c in cols_ocultar if c in df_v_user.columns]).copy()
 
         if search_v:
@@ -933,37 +993,63 @@ elif modulo_seleccionado == "🛒 Compras":
         col_m_nom_cta = obtener_columna(df_main, ['DESC CTA CBLE', 'DESCRIPCION CUENTA', 'NOMBRE CUENTA', 'CUENTA_NORMALIZADA'])
         col_m_resp = 'RESPONSABLE'
 
+        mapa_cuentas = pd.DataFrame()
         if col_m_num_cta and col_m_nom_cta and col_m_resp in df_main.columns:
-            mapa_cuentas = df_main[[col_m_num_cta, col_m_nom_cta, col_m_resp]].drop_duplicates().copy()
-            mapa_cuentas[col_m_num_cta] = mapa_cuentas[col_m_num_cta].astype(str).str.strip()
-            mapa_cuentas[col_m_resp] = mapa_cuentas[col_m_resp].astype(str).str.strip().str.upper()
-        else:
-            mapa_cuentas = pd.DataFrame()
+            mapa_base = df_main[[col_m_num_cta, col_m_nom_cta, col_m_resp]].copy()
+            mapa_base['KEY_CTA'] = mapa_base[col_m_num_cta].apply(normalizar_clave_cuenta)
+            mapa_base[col_m_resp] = mapa_base[col_m_resp].astype(str).str.strip().str.upper()
+            mapa_base = mapa_base[mapa_base['KEY_CTA'].notna()].copy()
+
+            mapa_cuentas = (
+                mapa_base
+                .sort_values(['KEY_CTA'])
+                .drop_duplicates(subset=['KEY_CTA'], keep='first')
+                [['KEY_CTA', col_m_nom_cta, col_m_resp]]
+                .rename(columns={
+                    col_m_nom_cta: 'NOMBRE_CUENTA_MAP',
+                    col_m_resp: 'RESPONSABLE_MAP'
+                })
+            )
 
         col_c_num_cta = obtener_columna(df_compras, ['CUENTA', 'CTA CBLE', 'CUENTA CONTABLE', 'NRO CUENTA', 'CODIGO'])
         col_c_monto = obtener_columna(df_compras, ['MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'VALOR', 'PRECIO TOTAL', 'NETO_TOTAL_FACTURA', 'PRECIO', 'NETO'])
         col_c_mes = 'MES_NOMBRE' if 'MES_NOMBRE' in df_compras.columns else obtener_columna(df_compras, ['MES', 'FECHA'])
+        col_c_resp_directo = obtener_columna(df_compras, ['RESPONSABLE', 'SOLICITANTE', 'USUARIO', 'COMPRADOR'])
+        col_c_nombre_directo = obtener_columna(df_compras, ['DESC CTA CBLE', 'NOMBRE CUENTA', 'DESCRIPCION CUENTA', 'CONCEPTO', 'CATEGORIA', 'RUBRO'])
 
         df_c_trabajo = df_compras.copy()
 
-        if col_c_num_cta and not mapa_cuentas.empty:
-            df_c_trabajo['KEY_CTA'] = df_c_trabajo[col_c_num_cta].astype(str).str.strip()
-            
-            df_c_trabajo = df_c_trabajo.merge(
-                mapa_cuentas.rename(columns={
-                    col_m_num_cta: 'KEY_CTA',
-                    col_m_nom_cta: 'NOMBRE_CUENTA_MAP',
-                    col_m_resp: 'RESPONSABLE_MAP'
-                }),
-                on='KEY_CTA',
-                how='left'
-            )
-            
-            col_nombre_mostrar = 'NOMBRE_CUENTA_MAP'
-            col_resp_cruce = 'RESPONSABLE_MAP'
+        if col_c_num_cta:
+            df_c_trabajo['KEY_CTA'] = df_c_trabajo[col_c_num_cta].apply(normalizar_clave_cuenta)
+            if not mapa_cuentas.empty:
+                df_c_trabajo = df_c_trabajo.merge(mapa_cuentas, on='KEY_CTA', how='left')
+
+        if col_c_resp_directo and col_c_resp_directo in df_c_trabajo.columns:
+            resp_directo_c = df_c_trabajo[col_c_resp_directo].astype("object")
         else:
-            col_nombre_mostrar = obtener_columna(df_c_trabajo, ['DESC CTA CBLE', 'CONCEPTO', 'CATEGORIA', 'RUBRO', 'PROVEEDOR'])
-            col_resp_cruce = obtener_columna(df_c_trabajo, ['RESPONSABLE', 'USUARIO', 'SOLICITANTE'])
+            resp_directo_c = pd.Series([None] * len(df_c_trabajo), index=df_c_trabajo.index, dtype="object")
+
+        resp_map_c = (
+            df_c_trabajo['RESPONSABLE_MAP'].astype("object")
+            if 'RESPONSABLE_MAP' in df_c_trabajo.columns
+            else pd.Series([None] * len(df_c_trabajo), index=df_c_trabajo.index, dtype="object")
+        )
+        df_c_trabajo['RESPONSABLE_FINAL'] = coalesce_texto(resp_directo_c, resp_map_c).astype(str).str.strip().str.upper()
+
+        if col_c_nombre_directo and col_c_nombre_directo in df_c_trabajo.columns:
+            nom_directo_c = df_c_trabajo[col_c_nombre_directo].astype("object")
+        else:
+            nom_directo_c = pd.Series([None] * len(df_c_trabajo), index=df_c_trabajo.index, dtype="object")
+
+        nom_map_c = (
+            df_c_trabajo['NOMBRE_CUENTA_MAP'].astype("object")
+            if 'NOMBRE_CUENTA_MAP' in df_c_trabajo.columns
+            else pd.Series([None] * len(df_c_trabajo), index=df_c_trabajo.index, dtype="object")
+        )
+        df_c_trabajo['NOMBRE_CUENTA_FINAL'] = coalesce_texto(nom_directo_c, nom_map_c)
+
+        col_nombre_mostrar = 'NOMBRE_CUENTA_FINAL'
+        col_resp_cruce = 'RESPONSABLE_FINAL'
 
         # ---------------------------------------------------------
         # 2. FILTRADO POR RESPONSABLE LOGUEADO
@@ -976,12 +1062,23 @@ elif modulo_seleccionado == "🛒 Compras":
                 df_c_user = df_c_trabajo.copy()
         else:
             st.sidebar.subheader("🎯 Filtros Administrador")
-            resps_disp = sorted(df_main['RESPONSABLE'].dropna().unique()) if not df_main.empty else []
-            f_resp_c = st.sidebar.multiselect("Filtrar por Responsables:", resps_disp, default=resps_disp, key="f_resp_c_main")
-            
+            resps_disp = sorted([
+                r for r in df_c_trabajo[col_resp_cruce].dropna().astype(str).str.strip().str.upper().unique()
+                if r not in ('', 'NAN', 'NONE', '-')
+            ]) if col_resp_cruce in df_c_trabajo.columns else []
+
+            f_resp_c = st.sidebar.multiselect(
+                "Filtrar por Responsables:",
+                resps_disp,
+                default=resps_disp,
+                key="f_resp_c_main"
+            )
+
             if f_resp_c and col_resp_cruce in df_c_trabajo.columns:
-                resps_upper = [r.upper() for r in f_resp_c]
-                df_c_user = df_c_trabajo[df_c_trabajo[col_resp_cruce].astype(str).str.upper().isin(resps_upper)].copy()
+                resps_upper = [str(r).strip().upper() for r in f_resp_c]
+                df_c_user = df_c_trabajo[
+                    df_c_trabajo[col_resp_cruce].astype(str).str.strip().str.upper().isin(resps_upper)
+                ].copy()
             else:
                 df_c_user = df_c_trabajo.copy()
 
@@ -1108,7 +1205,7 @@ elif modulo_seleccionado == "🛒 Compras":
 
         search_c = st.text_input("🔎 Buscar por Nombre de Cuenta, Proveedor o Detalles:", "",key="search_c_main")
         
-        cols_ocultar_c = ['KEY_CTA', 'RESPONSABLE_MAP', 'PROVEEDOR_LABEL']
+        cols_ocultar_c = ['KEY_CTA', 'RESPONSABLE_MAP', 'RESPONSABLE_FINAL', 'NOMBRE_CUENTA_MAP', 'PROVEEDOR_LABEL']
         df_c_render = df_c_user.drop(columns=[c for c in cols_ocultar_c if c in df_c_user.columns]).copy()
 
         if search_c:
