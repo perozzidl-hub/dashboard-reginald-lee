@@ -11,7 +11,7 @@ import unicodedata
 def limpiar_filtros():
     keys_filtros = [
         'f_resp_main', 'f_mes_main', 'f_cta_nom_main', 'search_main',
-        'f_resp_v_main', 'f_mes_v_main', 'f_resp_v_v2', 'f_mes_v_v2', 'f_cta_nom_main', 'search_v_main',
+        'f_resp_v_main', 'f_mes_v_main', 'f_resp_v_v2', 'f_mes_v_v2', 'f_resp_v_v3', 'f_mes_v_v3', 'f_cta_nom_main', 'search_v_main',
         'f_resp_c_main', 'f_mes_c_main', 'f_cta_nom_c_main', 'search_c_main',
         'f_loc_main', 'f_grupo_main', 'search_kw_main'
     ]
@@ -340,6 +340,47 @@ def obtener_columna(df, opciones):
             return mapa[clave]
     return None
 
+def obtener_columna_responsable_vales(df):
+    """
+    Localiza la columna visible 'Responsable' de Vales de Consumo.
+    Si Excel trae encabezados duplicados, pandas puede renombrarlos como
+    'Responsable', 'Responsable.1', etc. En ese caso elige la candidata
+    cuyo contenido sea principalmente texto/nombres y no códigos numéricos.
+    """
+    if df is None or len(df.columns) == 0:
+        return None
+
+    candidatas = []
+    for c in df.columns:
+        nombre = normalizar_nombre_columna(c)
+        # pandas desambigua encabezados duplicados con .1, .2, ...
+        base = re.sub(r"\.\d+$", "", nombre).strip()
+        if base == "RESPONSABLE":
+            serie = df[c]
+            valores = serie.dropna().astype(str).str.strip()
+            valores = valores[~valores.str.upper().isin(["", "NAN", "NONE", "NULL", "-"])]
+
+            if valores.empty:
+                alpha_ratio = 0.0
+                numeric_ratio = 0.0
+                cantidad = 0
+            else:
+                # Nombres de personas/sectores deben contener letras; IDs puros no.
+                alpha_ratio = valores.str.contains(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]", regex=True).mean()
+                numeric_ratio = pd.to_numeric(valores, errors="coerce").notna().mean()
+                cantidad = len(valores)
+
+            # Da mucho peso a contenido alfabético y penaliza IDs numéricos.
+            score = (alpha_ratio * 100.0) - (numeric_ratio * 80.0) + min(cantidad, 1000) / 10000.0
+            candidatas.append((score, alpha_ratio, -numeric_ratio, c))
+
+    if not candidatas:
+        return None
+
+    candidatas.sort(reverse=True, key=lambda x: (x[0], x[1], x[2]))
+    return candidatas[0][3]
+
+
 def convertir_fecha_excel_robusta(serie):
     """
     Convierte fechas reales, textos y seriales de Excel sin transformar números comunes
@@ -423,7 +464,19 @@ def cargar_datos_multihoja(file):
 
     # 2. Hoja Vales de Consumo
     df_vales = pd.DataFrame()
-    nombre_hoja_vales = next((h for h in hojas if 'VALE' in h.upper()), None)
+    # Prioridad absoluta a la hoja cuyo nombre sea exactamente "Vales de Consumo"
+    # (tolerando mayúsculas, espacios y acentos). Sólo si no existe usamos un fallback parcial.
+    objetivo_vales = normalizar_nombre_columna("Vales de Consumo")
+    nombre_hoja_vales = next(
+        (h for h in hojas if normalizar_nombre_columna(h) == objetivo_vales),
+        None
+    )
+    if nombre_hoja_vales is None:
+        nombre_hoja_vales = next(
+            (h for h in hojas if 'VALE' in normalizar_nombre_columna(h)),
+            None
+        )
+
     if nombre_hoja_vales:
         df_vales = pd.read_excel(xls, sheet_name=nombre_hoja_vales)
     elif len(hojas) > 1:
@@ -825,7 +878,7 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
         col_v_monto = obtener_columna(df_vales, ['MONTO', 'IMPORTE', 'TOTAL', 'SALDO', 'VALOR', 'PRECIO TOTAL', 'NETO_TOTAL_FACTURA', 'CANTIDAD'])
         col_v_mes = 'MES_NOMBRE' if 'MES_NOMBRE' in df_vales.columns else obtener_columna(df_vales, ['MES', 'FECHA'])
         # IMPORTANTE: el filtro de responsables de Vales sale EXCLUSIVAMENTE de la columna 'Responsable' de esa hoja.
-        col_v_resp_directo = obtener_columna(df_vales, ['RESPONSABLE'])
+        col_v_resp_directo = obtener_columna_responsable_vales(df_vales)
         col_v_nombre_directo = obtener_columna(df_vales, ['DESC CTA CBLE', 'NOMBRE CUENTA', 'DESCRIPCION CUENTA', 'CONCEPTO', 'CATEGORIA', 'RUBRO'])
 
         df_v_trabajo = df_vales.copy()
@@ -883,10 +936,13 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
                 df_v_user = df_v_trabajo.iloc[0:0].copy()
         else:
             st.sidebar.subheader("🎯 Filtros Administrador")
+            if col_v_resp_directo:
+                st.sidebar.caption(f"Fuente: Vales de Consumo → {col_v_resp_directo}")
 
             # Limpia estado antiguo de versiones previas para que no sobrevivan selecciones erróneas.
-            if 'f_resp_v_main' in st.session_state:
-                del st.session_state['f_resp_v_main']
+            for _key_antigua in ('f_resp_v_main', 'f_resp_v_v2'):
+                if _key_antigua in st.session_state:
+                    del st.session_state[_key_antigua]
 
             resps_disp = sorted([
                 r for r in df_v_trabajo['RESPONSABLE_FINAL'].dropna().astype(str).str.strip().unique()
@@ -898,7 +954,7 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
                     "Filtrar por Responsables:",
                     resps_disp,
                     default=resps_disp,
-                    key="f_resp_v_v2"
+                    key="f_resp_v_v3"
                 )
                 if f_resp_v:
                     seleccion = {str(r).strip() for r in f_resp_v}
@@ -917,8 +973,9 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
 
         # Meses: las opciones se toman de TODA la hoja Vales, no del dataframe ya filtrado
         # por responsable. Esto garantiza que el selector muestre todos los meses cargados.
-        if 'f_mes_v_main' in st.session_state:
-            del st.session_state['f_mes_v_main']
+        for _key_mes_antigua in ('f_mes_v_main', 'f_mes_v_v2'):
+            if _key_mes_antigua in st.session_state:
+                del st.session_state[_key_mes_antigua]
 
         if col_v_mes and col_v_mes in df_v_trabajo.columns:
             meses_v = sorted([
@@ -929,7 +986,7 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
                 "Filtrar Mes:",
                 meses_v,
                 default=meses_v,
-                key="f_mes_v_v2"
+                key="f_mes_v_v3"
             )
             if f_mes_v:
                 df_v_user = df_v_user[df_v_user[col_v_mes].astype(str).isin(f_mes_v)]
