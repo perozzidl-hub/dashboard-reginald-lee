@@ -326,6 +326,22 @@ def normalizar_nombre_columna(nombre):
     s = re.sub(r"\s+", " ", s).upper()
     return s
 
+def normalizar_dimension_texto(serie, mayusculas=False):
+    """Unifica los tipos mixtos procedentes de Excel sin convertir nulos en "nan"."""
+    valores = serie.astype("string").str.strip()
+    vacios = valores.str.casefold().isin(("", "nan", "none", "null", "nat"))
+    valores = valores.mask(vacios, pd.NA)
+    if mayusculas:
+        valores = valores.str.upper()
+    return valores
+
+
+def opciones_filtro_texto(serie, mayusculas=False):
+    """Genera opciones de Streamlit ordenables y uniformes (solo texto válido)."""
+    valores = normalizar_dimension_texto(serie, mayusculas=mayusculas)
+    return sorted(valores.dropna().unique().tolist(), key=str.casefold)
+
+
 def obtener_columna(df, opciones):
     if df is None or df.empty and len(df.columns) == 0:
         return None
@@ -506,7 +522,16 @@ def cargar_datos_multihoja(file):
     # 1. Hoja Principal (Presupuesto y Gastos)
     df_main = pd.read_excel(xls, sheet_name=hojas[0])
     df_main.columns = [str(c).strip() for c in df_main.columns]
-    
+
+    # Dimensiones categóricas: algunas celdas vienen como números y otras como texto.
+    # Se normalizan una sola vez para evitar errores de sort/groupby/multiselect.
+    for columna in ('RESPONSABLE', 'LOCACION', 'GRUPO DE CUENTAS', 'DESC CTA CBLE', 'TIPO2'):
+        if columna in df_main.columns:
+            df_main[columna] = normalizar_dimension_texto(
+                df_main[columna],
+                mayusculas=columna in ('RESPONSABLE', 'TIPO2'),
+            )
+
     if 'MES' in df_main.columns:
         df_main['MES_DT'] = pd.to_datetime(df_main['MES'], errors='coerce')
         df_main['MES_NOMBRE'] = df_main['MES_DT'].dt.strftime('%Y-%m')
@@ -706,35 +731,26 @@ if modulo_seleccionado == "📊 Presupuesto y Gastos":
 
     if not df_main.empty:
         if not st.session_state['is_admin']:
-            df_user = df_main[df_main['RESPONSABLE'].astype(str).str.upper() == st.session_state['user']]
+            df_user = df_main[
+                df_main['RESPONSABLE'].astype('string').str.upper() == st.session_state['user']
+            ].copy()
         else:
             df_user = df_main.copy()
 
         st.sidebar.subheader("🎯 Filtros Presupuestarios")
-        meses_disp = sorted(df_user['MES_NOMBRE'].dropna().unique())
-        locs_disp = sorted(df_user['LOCACION'].dropna().unique())
-        grupos_disp = sorted(df_user['GRUPO DE CUENTAS'].dropna().unique())
+        meses_disp = opciones_filtro_texto(df_user['MES_NOMBRE'])
+        locs_disp = opciones_filtro_texto(df_user['LOCACION'])
+        grupos_disp = opciones_filtro_texto(df_user['GRUPO DE CUENTAS'])
 
         f_mes = st.sidebar.multiselect("Meses", meses_disp, default=meses_disp, key="f_mes_main")
         f_loc = st.sidebar.multiselect("Locación / Planta", locs_disp, default=locs_disp, key="f_loc_main")
         f_grupo = st.sidebar.multiselect("Grupo de Cuentas", grupos_disp, default=grupos_disp, key="f_grupo_main")
 
         if st.session_state['is_admin']:
-            df_user["RESPONSABLE"] = (
-    df_user["RESPONSABLE"]
-    .astype("string")
-    .str.strip()
-)
-
-resps_disp = sorted(
-    df_user["RESPONSABLE"]
-    .dropna()
-    .loc[lambda s: s.ne("")]
-    .unique()
-    .tolist(),
-    key=str.casefold
-)
-            f_resp = st.sidebar.multiselect("Responsable Sector", resps_disp, default=resps_disp, key="f_resp_main")
+            resps_disp = opciones_filtro_texto(df_user['RESPONSABLE'], mayusculas=True)
+            f_resp = st.sidebar.multiselect(
+                "Responsable Sector", resps_disp, default=resps_disp, key="f_resp_main"
+            )
         else:
             f_resp = [st.session_state['user']]
 
@@ -742,7 +758,7 @@ resps_disp = sorted(
             (df_user['MES_NOMBRE'].isin(f_mes)) &
             (df_user['LOCACION'].isin(f_loc)) &
             (df_user['GRUPO DE CUENTAS'].isin(f_grupo)) &
-            (df_user['RESPONSABLE'].astype(str).str.upper().isin(f_resp))
+            (df_user['RESPONSABLE'].astype('string').str.upper().isin(f_resp))
         ]
 
         presupuesto_df = df_f[df_f['TIPO2'] == 'PRESUPUESTO']
@@ -853,7 +869,7 @@ resps_disp = sorted(
         st.markdown("### 🔍 Consulta y Auditoría Transaccional de Gastos")
 
         df_auditoria = gasto_df.copy()
-        cuentas_unicas = sorted(df_auditoria['DESC CTA CBLE'].dropna().unique())
+        cuentas_unicas = opciones_filtro_texto(df_auditoria['DESC CTA CBLE'])
         col_f1, col_f2 = st.columns([2, 1])
         with col_f1:
             f_cuentas_tabla = st.multiselect("🔎 Filtrar por Cuenta Contable:", cuentas_unicas, default=[])
@@ -865,9 +881,9 @@ resps_disp = sorted(
         if search_kw:
             sk = search_kw.lower()
             mask = (
-                df_auditoria['DES1'].astype(str).str.lower().str.contains(sk) |
-                df_auditoria['INTERNO'].astype(str).str.lower().str.contains(sk) |
-                df_auditoria['TEXTO INTERNO'].astype(str).str.lower().str.contains(sk)
+                df_auditoria['DES1'].astype(str).str.lower().str.contains(sk, regex=False, na=False) |
+                df_auditoria['INTERNO'].astype(str).str.lower().str.contains(sk, regex=False, na=False) |
+                df_auditoria['TEXTO INTERNO'].astype(str).str.lower().str.contains(sk, regex=False, na=False)
             )
             df_auditoria = df_auditoria[mask]
 
@@ -1186,7 +1202,7 @@ elif modulo_seleccionado == "🎟️ Vales de Consumo":
         df_v_render = df_v_user.drop(columns=[c for c in cols_ocultar if c in df_v_user.columns]).copy()
 
         if search_v:
-            mask_v = df_v_render.astype(str).apply(lambda x: x.str.lower().str.contains(search_v.lower())).any(axis=1)
+            mask_v = df_v_render.astype(str).apply(lambda x: x.str.lower().str.contains(search_v.lower(), regex=False, na=False)).any(axis=1)
             df_v_render = df_v_render[mask_v]
 
         st.dataframe(df_v_render, use_container_width=True, height=380)
@@ -1309,10 +1325,12 @@ elif modulo_seleccionado == "🛒 Compras":
         st.sidebar.subheader("🎯 Filtros Compras")
         
         if col_c_mes and col_c_mes in df_c_user.columns:
-            meses_c = sorted(df_c_user[col_c_mes].dropna().unique())
+            meses_c = opciones_filtro_texto(df_c_user[col_c_mes])
             f_mes_c = st.sidebar.multiselect("Filtrar Mes:", meses_c, default=meses_c, key="f_mes_c_main")
             if f_mes_c:
-                df_c_user = df_c_user[df_c_user[col_c_mes].isin(f_mes_c)]
+                df_c_user = df_c_user[
+                    normalizar_dimension_texto(df_c_user[col_c_mes]).isin(f_mes_c)
+                ]
 
         if col_nombre_mostrar and col_nombre_mostrar in df_c_user.columns:
             nombres_cuentas_unicas = sorted(
@@ -1430,7 +1448,7 @@ elif modulo_seleccionado == "🛒 Compras":
         df_c_render = df_c_user.drop(columns=[c for c in cols_ocultar_c if c in df_c_user.columns]).copy()
 
         if search_c:
-            mask_c = df_c_render.astype(str).apply(lambda x: x.str.lower().str.contains(search_c.lower())).any(axis=1)
+            mask_c = df_c_render.astype(str).apply(lambda x: x.str.lower().str.contains(search_c.lower(), regex=False, na=False)).any(axis=1)
             df_c_render = df_c_render[mask_c]
 
         st.dataframe(df_c_render, use_container_width=True, height=380)
