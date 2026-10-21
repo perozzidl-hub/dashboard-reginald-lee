@@ -720,7 +720,20 @@ if modulo_seleccionado == "📊 Presupuesto y Gastos":
         f_grupo = st.sidebar.multiselect("Grupo de Cuentas", grupos_disp, default=grupos_disp, key="f_grupo_main")
 
         if st.session_state['is_admin']:
-            resps_disp = sorted(df_user['RESPONSABLE'].dropna().unique())
+            df_user["RESPONSABLE"] = (
+    df_user["RESPONSABLE"]
+    .astype("string")
+    .str.strip()
+)
+
+resps_disp = sorted(
+    df_user["RESPONSABLE"]
+    .dropna()
+    .loc[lambda s: s.ne("")]
+    .unique()
+    .tolist(),
+    key=str.casefold
+)
             f_resp = st.sidebar.multiselect("Responsable Sector", resps_disp, default=resps_disp, key="f_resp_main")
         else:
             f_resp = [st.session_state['user']]
